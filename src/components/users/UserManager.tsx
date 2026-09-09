@@ -5,6 +5,7 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { usersService } from '../../lib/services';
 import { UserModal } from './UserModal';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField } from '../../lib/searchUtils';
 
 export function UserManager() {
   const { state, dispatch } = useApp();
@@ -14,9 +15,16 @@ export function UserManager() {
   const [loading, setLoading] = useState(false);
 
   const filteredUsers = state.users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.username.toLowerCase().includes(searchTerm.toLowerCase())
+    matchesAnyField(
+      [
+        user.name,
+        user.email,
+        user.username,
+        user.role,
+        user.id,
+      ],
+      searchTerm
+    )
   );
 
   const handleEditUser = (user: UserType) => {

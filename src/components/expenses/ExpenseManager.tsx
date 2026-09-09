@@ -7,6 +7,7 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { Expense } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { ExpenseModal, DEFAULT_CATEGORIES } from './ExpenseModal';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 
@@ -24,12 +25,18 @@ export function ExpenseManager() {
 
   const filteredExpenses = useMemo(() => {
     const now = new Date();
-    return state.expenses.filter(expense => {
-      const matchesSearch =
-        expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        expense.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (expense.receiptNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (expense.supplierName || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const filtered = state.expenses.filter(expense => {
+      const matchesSearch = matchesAnyField(
+        [
+          expense.description,
+          expense.category,
+          expense.receiptNumber,
+          expense.supplierName,
+          expense.paymentMethod,
+          expense.notes,
+        ],
+        searchTerm
+      );
 
       const matchesCategory = categoryFilter === 'all' || expense.category === categoryFilter;
       const matchesPayment = paymentFilter === 'all' || expense.paymentMethod === paymentFilter;
@@ -58,7 +65,16 @@ export function ExpenseManager() {
       }
 
       return matchesSearch && matchesCategory && matchesPayment && matchesDate;
-    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    });
+    const sorted = sortBySearchRelevance(
+      filtered,
+      searchTerm,
+      e => `${e.description} ${e.category} ${e.receiptNumber || ''} ${e.supplierName || ''}`
+    );
+    if (!searchTerm) {
+      return sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+    return sorted;
   }, [state.expenses, searchTerm, categoryFilter, paymentFilter, dateFilter]);
 
   const summary = useMemo(() => {

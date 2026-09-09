@@ -8,6 +8,7 @@ import { useApp, useFeatureToggles } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { Rental, RentalItem, ReturnItem, ProductReturn } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { RentalModal } from './RentalModal';
 import { ReturnModal } from '../returns/ReturnModal';
 import { format, isBefore, differenceInDays, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
@@ -27,7 +28,7 @@ export function RentalsManager() {
 
   const list = useMemo(() => {
     const now = new Date();
-    return state.rentals.map(rental => {
+    const mapped = state.rentals.map(rental => {
       let computedStatus: Rental['status'] = rental.status;
       if ((rental.status === 'active') && isBefore(new Date(rental.rentTo), now)) {
         computedStatus = 'overdue';
@@ -36,20 +37,35 @@ export function RentalsManager() {
       const daysRented = Math.max(1, differenceInDays(new Date(rental.rentTo), new Date(rental.rentFrom)) + 1);
       const balance = Math.max(0, rental.totalRent - rental.paidAmount);
       return { ...rental, computedStatus, daysOverdue, daysRented, balance };
-    }).filter(rental => {
-      const matchesSearch =
-        rental.rentalNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (rental.customerName && rental.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (rental.notes && rental.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+    });
+    const filtered = mapped.filter(rental => {
+      const matchesSearch = matchesAnyField(
+        [
+          rental.rentalNumber,
+          rental.customerName,
+          rental.notes,
+          ...rental.items.map(i => `${i.productName} ${i.sku}`),
+        ],
+        searchTerm
+      );
       const matchesStatus = statusFilter === 'all' || rental.computedStatus === statusFilter;
       return matchesSearch && matchesStatus;
-    }).sort((a, b) => {
-      const statusOrder: Record<string, number> = { overdue: 0, active: 1, damaged: 2, lost: 3, returned: 4 };
-      if (statusOrder[a.computedStatus] !== statusOrder[b.computedStatus]) {
-        return statusOrder[a.computedStatus] - statusOrder[b.computedStatus];
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
+    const sorted = sortBySearchRelevance(
+      filtered,
+      searchTerm,
+      r => `${r.rentalNumber} ${r.customerName || ''} ${r.notes || ''}`
+    );
+    if (!searchTerm) {
+      return sorted.sort((a, b) => {
+        const statusOrder: Record<string, number> = { overdue: 0, active: 1, damaged: 2, lost: 3, returned: 4 };
+        if (statusOrder[a.computedStatus] !== statusOrder[b.computedStatus]) {
+          return statusOrder[a.computedStatus] - statusOrder[b.computedStatus];
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+    return sorted;
   }, [state.rentals, searchTerm, statusFilter]);
 
   const summary = useMemo(() => {

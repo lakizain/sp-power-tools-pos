@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Trash2, Plus, Minus, User, Percent, FileText, ShoppingCart } from 'lucide-react';
 import { CartItem, Customer } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
+import { matchesAnyField } from '../../lib/searchUtils';
 
 interface CartProps {
   onCheckout: () => void;
@@ -66,9 +67,10 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
   };
 
   const filteredCustomers = state.customers.filter(customer =>
-    customer.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    customer.email.toLowerCase().includes(customerSearch.toLowerCase()) ||
-    customer.phone.includes(customerSearch)
+    matchesAnyField(
+      [customer.name, customer.email, customer.phone, customer.id],
+      customerSearch
+    )
   );
 
   const subtotal = state.cart.reduce((sum, item) => {

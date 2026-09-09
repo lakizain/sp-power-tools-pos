@@ -8,6 +8,7 @@ import { useApp, useFeatureToggles } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { OutstandingPayment, PaymentRecord } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { PaymentModal } from './PaymentModal';
 import { format, isBefore, isToday, differenceInDays } from 'date-fns';
 
@@ -37,25 +38,40 @@ export function OutstandingPayments() {
 
   const list = useMemo(() => {
     const now = new Date();
-    return state.outstandingPayments.map(op => {
+    const mapped = state.outstandingPayments.map(op => {
       const isOverdue = op.status !== 'paid' && isBefore(new Date(op.dueDate), now) && !isToday(new Date(op.dueDate));
       const daysOverdue = isOverdue ? differenceInDays(now, new Date(op.dueDate)) : 0;
       return { ...op, isOverdue, daysOverdue };
-    }).filter(op => {
-      const matchesSearch =
-        op.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        op.customerName.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+    const filtered = mapped.filter(op => {
+      const matchesSearch = matchesAnyField(
+        [
+          op.invoiceNumber,
+          op.customerName,
+          op.notes,
+          op.saleId,
+        ],
+        searchTerm
+      );
       const matchesStatus = statusFilter === 'all' || op.status === statusFilter;
       const matchesOverdue =
         overdueFilter === 'all' ||
         (overdueFilter === 'overdue' && op.isOverdue) ||
         (overdueFilter === 'due_today' && isToday(new Date(op.dueDate)) && op.status !== 'paid');
       return matchesSearch && matchesStatus && matchesOverdue;
-    }).sort((a, b) => {
-      // Show overdue first, then by due date
-      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     });
+    const sorted = sortBySearchRelevance(
+      filtered,
+      searchTerm,
+      op => `${op.invoiceNumber} ${op.customerName}`
+    );
+    if (!searchTerm) {
+      return sorted.sort((a, b) => {
+        if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      });
+    }
+    return sorted;
   }, [state.outstandingPayments, searchTerm, statusFilter, overdueFilter]);
 
   const summary = useMemo(() => {

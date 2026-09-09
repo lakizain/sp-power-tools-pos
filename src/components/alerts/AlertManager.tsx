@@ -33,6 +33,7 @@ import {
 } from '../../lib/services';
 import { alertService } from '../../lib/alertService';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField } from '../../lib/searchUtils';
 import { RecipientModal } from './RecipientModal';
 import { TemplateModal } from './TemplateModal';
 import { ConfigurationCard } from './ConfigurationCard';
@@ -99,8 +100,18 @@ export function AlertManager() {
 
     // Filter history
     const filteredHistory = history.filter(alert => {
-        const matchesSearch = alert.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            alert.recipientName.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = matchesAnyField(
+            [
+                alert.productName,
+                alert.recipientName,
+                alert.alertType,
+                alert.channel,
+                alert.messageContent,
+                alert.productSku,
+                alert.errorMessage,
+            ],
+            searchTerm
+        );
         const matchesStatus = filterStatus === 'all' || alert.status === filterStatus;
         return matchesSearch && matchesStatus;
     });

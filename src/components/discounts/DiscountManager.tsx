@@ -5,6 +5,7 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { DiscountModal } from './DiscountModal';
 import { format } from 'date-fns';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField } from '../../lib/searchUtils';
 
 export function DiscountManager() {
   const { state, dispatch } = useApp();
@@ -13,8 +14,15 @@ export function DiscountManager() {
   const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
 
   const filteredDiscounts = state.discounts.filter(discount =>
-    discount.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    discount.description.toLowerCase().includes(searchTerm.toLowerCase())
+    matchesAnyField(
+      [
+        discount.name,
+        discount.description,
+        discount.type,
+        discount.id,
+      ],
+      searchTerm
+    )
   );
 
   const handleEditDiscount = (discount: Discount) => {

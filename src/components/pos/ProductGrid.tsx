@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Search, Plus, Package, Scale, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
+import { matchesAnyField } from '../../lib/searchUtils';
 
 interface ProductGridProps {
   onAddToCart: (product: Product, weight?: number) => void;
@@ -18,9 +19,16 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
   const [showRightScroll, setShowRightScroll] = useState(false);
 
   const filteredProducts = state.products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (product.barcode && product.barcode.includes(searchTerm));
+    const matchesSearch = matchesAnyField(
+      [
+        product.name,
+        product.sku,
+        product.barcode,
+        product.description,
+        product.category,
+      ],
+      searchTerm
+    );
     const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
     return matchesSearch && matchesCategory && product.active;
   });

@@ -9,6 +9,7 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { ProductReturn, Sale, CartItem } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { ReturnModal } from './ReturnModal';
 import { format } from 'date-fns';
 
@@ -25,22 +26,52 @@ export function ReturnsManager() {
   const [billSearchTerm, setBillSearchTerm] = useState('');
   const [searchedBill, setSearchedBill] = useState<Sale | null>(null);
   const [billSearchError, setBillSearchError] = useState('');
+  const [showBillSuggestions, setShowBillSuggestions] = useState(false);
+
+  const billSuggestions = useMemo(() => {
+    const term = billSearchTerm.trim();
+    if (!term) return [];
+    const matched = state.sales.filter(s =>
+      matchesAnyField(
+        [s.invoiceNumber, s.receiptNumber, s.customerName, s.cashier],
+        term
+      )
+    );
+    return sortBySearchRelevance(
+      matched.slice(0, 8),
+      term,
+      s => `${s.invoiceNumber} ${s.receiptNumber || ''} ${s.customerName || ''}`
+    );
+  }, [state.sales, billSearchTerm]);
 
   const canEdit = profile?.role === 'admin' || profile?.role === 'manager';
 
   const filteredReturns = useMemo(() => {
-    return state.returns.filter(r => {
-      const matchesSearch =
-        r.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (r.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.items.some(i => i.productName.toLowerCase().includes(searchTerm.toLowerCase()));
+    const result = state.returns.filter(r => {
+      const matchesSearch = matchesAnyField(
+        [
+          r.invoiceNumber,
+          r.customerName,
+          r.reason,
+          ...r.items.map(i => i.productName),
+        ],
+        searchTerm
+      );
 
       const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
       const matchesMethod = methodFilter === 'all' || r.returnMethod === methodFilter;
 
       return matchesSearch && matchesStatus && matchesMethod;
-    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    });
+    const sorted = sortBySearchRelevance(
+      result,
+      searchTerm,
+      r => `${r.invoiceNumber} ${r.customerName || ''} ${r.reason}`
+    );
+    if (!searchTerm) {
+      return sorted.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
+    return sorted;
   }, [state.returns, searchTerm, statusFilter, methodFilter]);
 
   const summary = useMemo(() => {
@@ -104,23 +135,37 @@ export function ReturnsManager() {
 
   const handleBillSearch = () => {
     setBillSearchError('');
-    const term = billSearchTerm.trim().toLowerCase();
+    setShowBillSuggestions(false);
+    const term = billSearchTerm.trim();
     if (!term) {
       setBillSearchError('Please enter an invoice / bill number.');
       setSearchedBill(null);
       return;
     }
-    const found = state.sales.find(s =>
-      s.invoiceNumber.toLowerCase() === term ||
-      s.invoiceNumber.toLowerCase().includes(term) ||
-      (s.receiptNumber && s.receiptNumber.toLowerCase() === term)
+    const matched = state.sales.filter(s =>
+      matchesAnyField(
+        [s.invoiceNumber, s.receiptNumber, s.customerName, s.cashier],
+        term
+      )
     );
-    if (!found) {
+    const sorted = sortBySearchRelevance(
+      matched,
+      term,
+      s => `${s.invoiceNumber} ${s.receiptNumber || ''} ${s.customerName || ''}`
+    );
+    if (sorted.length === 0) {
       setBillSearchError(`No bill found for "${billSearchTerm}". Try another invoice number.`);
       setSearchedBill(null);
       return;
     }
-    setSearchedBill(found);
+    setSearchedBill(sorted[0]);
+  };
+
+  const handleSelectSuggestion = (sale: Sale) => {
+    setBillSearchTerm(sale.invoiceNumber);
+    setSearchedBill(sale);
+    setShowBillSuggestions(false);
+    setBillSearchError('');
   };
 
   const handleReturnFullBill = () => {
@@ -313,12 +358,45 @@ export function ReturnsManager() {
             <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
               type="text"
-              placeholder="Enter invoice / bill number (e.g. INV-1001)"
+              placeholder="Enter invoice / bill number (e.g. INV-1001) – try typing just a number like 2"
               value={billSearchTerm}
-              onChange={(e) => setBillSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleBillSearch()}
+              onChange={(e) => { setBillSearchTerm(e.target.value); setShowBillSuggestions(true); }}
+              onFocus={() => setShowBillSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowBillSuggestions(false), 150)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleBillSearch();
+                }
+              }}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent bg-white"
             />
+            {showBillSuggestions && billSuggestions.length > 0 && (
+              <ul className="absolute z-20 left-0 right-0 mt-1 bg-white border border-amber-200 rounded-xl shadow-xl max-h-64 overflow-y-auto">
+                {billSuggestions.map((s) => (
+                  <li
+                    key={s.id}
+                    onMouseDown={() => handleSelectSuggestion(s)}
+                    className="px-4 py-2.5 hover:bg-amber-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col min-w-0">
+                        <div className="text-sm font-bold text-gray-900 truncate">
+                          {s.invoiceNumber}
+                          {s.receiptNumber && <span className="ml-2 text-xs text-gray-500 font-normal">Receipt: {s.receiptNumber}</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {s.customerName || 'Walk-in'} · {format(new Date(s.timestamp), 'MMM dd, yyyy')}
+                        </div>
+                      </div>
+                      <div className="text-sm font-bold text-amber-700 whitespace-nowrap">
+                        {state.settings.currency} {s.total.toFixed(2)}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div className="flex gap-2">
             <button

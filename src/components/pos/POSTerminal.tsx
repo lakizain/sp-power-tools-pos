@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ProductGrid } from './ProductGrid';
 import { Cart } from './Cart';
 import { CheckoutModal } from './CheckoutModal';
@@ -61,6 +61,38 @@ export function POSTerminal() {
     minLength: 3,
     enabled: true,
   });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Backspace') return;
+
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (state.cart.length === 0) return;
+
+      e.preventDefault();
+
+      const lastIndex = state.cart.length - 1;
+      dispatch({ type: 'REMOVE_FROM_CART', payload: lastIndex });
+
+      if (state.activeSalesTab) {
+        const newCart = state.cart.slice(0, -1);
+        dispatch({
+          type: 'UPDATE_SALES_TAB',
+          payload: {
+            id: state.activeSalesTab,
+            updates: { cart: newCart }
+          }
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [state.cart, state.activeSalesTab, dispatch]);
 
   const addToCartFromScanner = (product: Product) => {
     if (product.trackInventory && product.stock <= 0) return;

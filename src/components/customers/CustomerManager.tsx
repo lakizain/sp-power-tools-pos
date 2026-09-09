@@ -5,6 +5,7 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { CustomerModal } from './CustomerModal';
 import { CustomerDetailModal } from './CustomerDetailModal';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField } from '../../lib/searchUtils';
 
 export function CustomerManager() {
   const { state, dispatch } = useApp();
@@ -14,9 +15,16 @@ export function CustomerManager() {
   const [viewingCustomer, setViewingCustomer] = useState<Customer | null>(null);
 
   const filteredCustomers = state.customers.filter((customer: Customer) =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone.includes(searchTerm)
+    matchesAnyField(
+      [
+        customer.name,
+        customer.email,
+        customer.phone,
+        customer.id,
+        customer.address,
+      ],
+      searchTerm
+    )
   );
 
   const handleEditCustomer = (customer: Customer) => {

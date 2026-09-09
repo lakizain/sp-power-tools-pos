@@ -5,6 +5,7 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { ProductModal } from './ProductModal';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 
 export function InventoryManager() {
   const { state } = useApp();
@@ -19,18 +20,39 @@ export function InventoryManager() {
 
   const categories = ['All', ...Array.from(new Set(state.products.map((p: Product) => p.category)))];
 
-  const filteredProducts = state.products
-    .filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (product.barcode && product.barcode.includes(searchTerm));
-      const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
+  const filteredProducts = (() => {
+    const filtered = state.products
+      .filter(product => {
+        const matchesSearch = matchesAnyField(
+          [
+            product.name,
+            product.sku,
+            product.barcode,
+            product.description,
+            product.category,
+          ],
+          searchTerm
+        );
+        const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      });
+    const sortedByRelevance = sortBySearchRelevance(
+      filtered,
+      searchTerm,
+      p => `${p.name} ${p.sku} ${p.barcode || ''}`
+    );
+    return sortedByRelevance.sort((a, b) => {
+      if (searchTerm) {
+        const scoreA = Number(searchTerm.toLowerCase() === a.name.toLowerCase()) * 100 +
+          Number(a.name.toLowerCase().startsWith(searchTerm.toLowerCase())) * 50 +
+          Number(a.sku.toLowerCase().startsWith(searchTerm.toLowerCase())) * 50;
+        const scoreB = Number(searchTerm.toLowerCase() === b.name.toLowerCase()) * 100 +
+          Number(b.name.toLowerCase().startsWith(searchTerm.toLowerCase())) * 50 +
+          Number(b.sku.toLowerCase().startsWith(searchTerm.toLowerCase())) * 50;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+      }
       let aValue: string | number;
       let bValue: string | number;
-
       switch (sortBy) {
         case 'name':
           aValue = a.name.toLowerCase();
@@ -48,13 +70,13 @@ export function InventoryManager() {
           aValue = a.name.toLowerCase();
           bValue = b.name.toLowerCase();
       }
-
       if (sortOrder === 'asc') {
         return aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
       } else {
         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
       }
     });
+  })();
 
   const lowStockProducts = state.products.filter((p: Product) => p.trackInventory && p.stock <= p.minStock);
   const totalValue = state.products.reduce((sum: number, p: Product) => sum + (p.stock * p.cost), 0);

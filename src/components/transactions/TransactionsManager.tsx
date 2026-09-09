@@ -8,6 +8,7 @@ import { CheckoutModal } from '../pos/CheckoutModal';
 import { ReturnModal } from '../returns/ReturnModal';
 import { salesService } from '../../lib/services';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 
 // Helper function to determine if a sale is a draft
 const isDraftSale = (sale: Sale) => {
@@ -57,11 +58,18 @@ export function TransactionsManager() {
   };
 
   const filteredTransactions = useMemo(() => {
-    return state.sales.filter(sale => {
-      const matchesSearch = 
-        (sale.receiptNumber ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (sale.cashier ?? '').toLowerCase().includes(searchTerm.toLowerCase());
+    const result = state.sales.filter(sale => {
+      const matchesSearch = matchesAnyField(
+        [
+          sale.invoiceNumber,
+          sale.receiptNumber,
+          sale.customerName,
+          sale.cashier,
+          sale.notes,
+          ...(sale.items?.map(i => i.productName || i.product?.name) || []),
+        ],
+        searchTerm
+      );
       
       // Handle draft status filter
       const saleStatus = isDraftSale(sale) ? 'draft' : sale.status;
@@ -90,7 +98,16 @@ export function TransactionsManager() {
       }
       
       return matchesSearch && matchesStatus && matchesPayment && matchesDate;
-    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    });
+    const sorted = sortBySearchRelevance(
+      result,
+      searchTerm,
+      s => `${s.invoiceNumber} ${s.receiptNumber || ''} ${s.customerName || ''} ${s.cashier || ''}`
+    );
+    if (!searchTerm) {
+      return sorted.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    }
+    return sorted;
   }, [state.sales, searchTerm, statusFilter, paymentFilter, dateFilter]);
 
   const totalRevenue = filteredTransactions.reduce((sum, sale) => sum + sale.total, 0);

@@ -7,6 +7,7 @@ import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { Supplier } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
+import { matchesAnyField } from '../../lib/searchUtils';
 import { SupplierModal } from './SupplierModal';
 import { format } from 'date-fns';
 
@@ -23,11 +24,17 @@ export function SupplierManager() {
 
   const filteredSuppliers = useMemo(() => {
     return state.suppliers.filter(supplier => {
-      const matchesSearch =
-        supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        supplier.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (supplier.contactPerson || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = matchesAnyField(
+        [
+          supplier.name,
+          supplier.phone,
+          supplier.email,
+          supplier.contactPerson,
+          supplier.address,
+          supplier.id,
+        ],
+        searchTerm
+      );
 
       const matchesStatus =
         statusFilter === 'all' ||
