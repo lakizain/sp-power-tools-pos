@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer } from 'recharts';
-import { DollarSign, ShoppingCart, Users, TrendingUp, Download, BarChart3 } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { DollarSign, ShoppingCart, Users, TrendingUp, Download, BarChart3, Wallet, PiggyBank, TrendingDown, Receipt } from 'lucide-react';
 import { useApp } from '../../context/SupabaseAppContext';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 
@@ -203,6 +203,150 @@ export function ReportsManager() {
     });
   }, [state.products, filteredSales, reportType]);
 
+  // Filtered Expenses
+  const filteredExpenses = useMemo(() => {
+    return state.expenses.filter(expense => {
+      const expenseDate = new Date(expense.date);
+      return expenseDate >= startOfDay(validStartDate) && expenseDate <= endOfDay(validEndDate);
+    });
+  }, [state.expenses, validStartDate, validEndDate]);
+
+  // Profit Analytics
+  const profitData = useMemo(() => {
+    let totalCOGS = 0;
+    let totalRevenue = 0;
+    const productProfit: Record<string, {
+      id: string;
+      name: string;
+      category: string;
+      quantitySold: number;
+      revenue: number;
+      cogs: number;
+      grossProfit: number;
+      margin: number;
+    }> = {};
+    const categoryProfit: Record<string, {
+      name: string;
+      revenue: number;
+      cogs: number;
+      grossProfit: number;
+    }> = {};
+
+    filteredSales.forEach(sale => {
+      totalRevenue += sale.total;
+      sale.items.forEach(item => {
+        const productId = item.product.id;
+        const productCost = item.product.cost || 0;
+        const itemCOGS = productCost * item.quantity;
+        const itemRevenue = item.subtotal;
+        const itemGrossProfit = itemRevenue - itemCOGS;
+        const category = item.product.category || 'Uncategorized';
+
+        totalCOGS += itemCOGS;
+
+        if (!productProfit[productId]) {
+          productProfit[productId] = {
+            id: productId,
+            name: item.product.name,
+            category: category,
+            quantitySold: 0,
+            revenue: 0,
+            cogs: 0,
+            grossProfit: 0,
+            margin: 0,
+          };
+        }
+        productProfit[productId].quantitySold += item.quantity;
+        productProfit[productId].revenue += itemRevenue;
+        productProfit[productId].cogs += itemCOGS;
+        productProfit[productId].grossProfit += itemGrossProfit;
+
+        if (!categoryProfit[category]) {
+          categoryProfit[category] = { name: category, revenue: 0, cogs: 0, grossProfit: 0 };
+        }
+        categoryProfit[category].revenue += itemRevenue;
+        categoryProfit[category].cogs += itemCOGS;
+        categoryProfit[category].grossProfit += itemGrossProfit;
+      });
+    });
+
+    // Calculate margins
+    Object.values(productProfit).forEach(p => {
+      p.margin = p.revenue > 0 ? (p.grossProfit / p.revenue) * 100 : 0;
+    });
+
+    const totalGrossProfit = totalRevenue - totalCOGS;
+    const grossProfitMargin = totalRevenue > 0 ? (totalGrossProfit / totalRevenue) * 100 : 0;
+    const totalExpensesAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const netProfit = totalGrossProfit - totalExpensesAmount;
+    const netProfitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    // Expense breakdown by category
+    const expenseByCategory: Record<string, { name: string; value: number }> = {};
+    filteredExpenses.forEach(expense => {
+      if (!expenseByCategory[expense.category]) {
+        expenseByCategory[expense.category] = { name: expense.category, value: 0 };
+      }
+      expenseByCategory[expense.category].value += expense.amount;
+    });
+
+    return {
+      totalRevenue,
+      totalCOGS,
+      totalGrossProfit,
+      grossProfitMargin,
+      totalExpenses: totalExpensesAmount,
+      netProfit,
+      netProfitMargin,
+      productProfit: Object.values(productProfit).sort((a, b) => b.grossProfit - a.grossProfit),
+      categoryProfit: Object.values(categoryProfit).sort((a, b) => b.grossProfit - a.grossProfit),
+      expenseByCategory: Object.values(expenseByCategory).sort((a, b) => b.value - a.value),
+    };
+  }, [filteredSales, filteredExpenses]);
+
+  // Daily Profit Trend
+  const dailyProfitData = useMemo(() => {
+    const days = parseInt(dateRange);
+    const profitByDay: Record<string, { date: string; revenue: number; cogs: number; grossProfit: number; expenses: number; netProfit: number }> = {};
+    
+    const daysToUse = dateRange === 'custom' 
+      ? Math.max(1, Math.ceil((validEndDate.getTime() - validStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+      : (isNaN(days) ? 7 : days);
+
+    for (let i = daysToUse - 1; i >= 0; i--) {
+      const date = format(subDays(validEndDate, i), 'MM/dd');
+      profitByDay[date] = { date, revenue: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0 };
+    }
+
+    // Add sales data
+    filteredSales.forEach(sale => {
+      const date = format(new Date(sale.timestamp), 'MM/dd');
+      if (profitByDay[date]) {
+        profitByDay[date].revenue += sale.total;
+        sale.items.forEach(item => {
+          const itemCOGS = (item.product.cost || 0) * item.quantity;
+          profitByDay[date].cogs += itemCOGS;
+        });
+        profitByDay[date].grossProfit = profitByDay[date].revenue - profitByDay[date].cogs;
+      }
+    });
+
+    // Add expense data
+    filteredExpenses.forEach(expense => {
+      const date = format(new Date(expense.date), 'MM/dd');
+      if (profitByDay[date]) {
+        profitByDay[date].expenses += expense.amount;
+      }
+    });
+
+    // Calculate net profit
+    Object.values(profitByDay).forEach(day => {
+      day.netProfit = day.grossProfit - day.expenses;
+    });
+
+    return Object.values(profitByDay);
+  }, [filteredSales, filteredExpenses, dateRange, validEndDate, validStartDate]);
+
   const COLORS = ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#EC4899'];
 
   const exportReport = () => {
@@ -239,6 +383,23 @@ export function ReportsManager() {
         return `${item.name},${item.sku},${item.category},${item.currentStock},${item.minStock},${item.stockStatus},${item.costPrice.toFixed(2)},${item.sellingPrice.toFixed(2)},${item.stockValue.toFixed(2)},${item.potentialRevenue.toFixed(2)},${item.soldQuantity},${item.revenue.toFixed(2)},${item.turnoverRatio.toFixed(2)},${item.profitMargin.toFixed(2)},${item.active ? 'Yes' : 'No'}`;
       }).join('\n');
       fileName = `pos-inventory-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    } else if (reportType === 'profit') {
+      csvHeader = 'Product,Category,Quantity Sold,Revenue,COGS,Gross Profit,Margin %\n';
+      csvData = profitData.productProfit.map(item => {
+        return `${item.name.replace(/,/g, ' ')},${item.category.replace(/,/g, ' ')},${item.quantitySold},${item.revenue.toFixed(2)},${item.cogs.toFixed(2)},${item.grossProfit.toFixed(2)},${item.margin.toFixed(2)}`;
+      }).join('\n');
+      
+      // Add summary section
+      csvData += '\n\n=== PROFIT SUMMARY ===\n';
+      csvData += `Total Revenue,${profitData.totalRevenue.toFixed(2)}\n`;
+      csvData += `Total COGS,${profitData.totalCOGS.toFixed(2)}\n`;
+      csvData += `Gross Profit,${profitData.totalGrossProfit.toFixed(2)}\n`;
+      csvData += `Gross Profit Margin %,${profitData.grossProfitMargin.toFixed(2)}\n`;
+      csvData += `Total Expenses,${profitData.totalExpenses.toFixed(2)}\n`;
+      csvData += `Net Profit,${profitData.netProfit.toFixed(2)}\n`;
+      csvData += `Net Profit Margin %,${profitData.netProfitMargin.toFixed(2)}\n`;
+      
+      fileName = `pos-profit-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     }
     
     const fullCsv = csvHeader + csvData;
@@ -285,6 +446,7 @@ export function ReportsManager() {
               className="select min-w-[150px]"
             >
               <option value="sales">Sales Report</option>
+              <option value="profit">Profit Report</option>
               <option value="inventory">Inventory Report</option>
               <option value="customers">Customer Report</option>
             </select>
@@ -486,6 +648,90 @@ export function ReportsManager() {
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reportType === 'profit' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+          <div className="stat-card bg-gradient-to-br from-green-500 to-green-600">
+            <div className="flex items-center justify-between relative z-10">
+              <div>
+                <p className="text-green-100 text-sm font-medium">Total Revenue</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalRevenue.toFixed(2)}</p>
+              </div>
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card bg-gradient-to-br from-blue-500 to-blue-600">
+            <div className="flex items-center justify-between relative z-10">
+              <div>
+                <p className="text-blue-100 text-sm font-medium">Cost of Goods Sold</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalCOGS.toFixed(2)}</p>
+              </div>
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <ShoppingCart className="h-6 w-6 lg:h-8 lg:w-8" />
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card bg-gradient-to-br from-emerald-500 to-emerald-600">
+            <div className="flex items-center justify-between relative z-10">
+              <div>
+                <p className="text-emerald-100 text-sm font-medium">Gross Profit</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalGrossProfit.toFixed(2)}</p>
+                <p className="text-emerald-100 text-xs mt-1">Margin: {profitData.grossProfitMargin.toFixed(1)}%</p>
+              </div>
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card bg-gradient-to-br from-rose-500 to-rose-600">
+            <div className="flex items-center justify-between relative z-10">
+              <div>
+                <p className="text-rose-100 text-sm font-medium">Total Expenses</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalExpenses.toFixed(2)}</p>
+                <p className="text-rose-100 text-xs mt-1">{filteredExpenses.length} entries</p>
+              </div>
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <TrendingDown className="h-6 w-6 lg:h-8 lg:w-8" />
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card bg-gradient-to-br from-indigo-500 to-indigo-600">
+            <div className="flex items-center justify-between relative z-10">
+              <div>
+                <p className="text-indigo-100 text-sm font-medium">Net Profit</p>
+                <p className={`text-xl lg:text-2xl font-bold ${profitData.netProfit < 0 ? 'text-red-200' : ''}`}>
+                  {state.settings.currency} {profitData.netProfit.toFixed(2)}
+                </p>
+                <p className="text-indigo-100 text-xs mt-1">Margin: {profitData.netProfitMargin.toFixed(1)}%</p>
+              </div>
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <PiggyBank className="h-6 w-6 lg:h-8 lg:w-8" />
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card bg-gradient-to-br from-amber-500 to-amber-600">
+            <div className="flex items-center justify-between relative z-10">
+              <div>
+                <p className="text-amber-100 text-sm font-medium">Profit per Transaction</p>
+                <p className="text-xl lg:text-2xl font-bold">
+                  {state.settings.currency} {totalTransactions > 0 ? (profitData.netProfit / totalTransactions).toFixed(2) : '0.00'}
+                </p>
+                <p className="text-amber-100 text-xs mt-1">{totalTransactions} transactions</p>
+              </div>
+              <div className="bg-white/20 p-3 rounded-2xl">
+                <Wallet className="h-6 w-6 lg:h-8 lg:w-8" />
               </div>
             </div>
           </div>
@@ -706,6 +952,159 @@ export function ReportsManager() {
         </div>
       )}
 
+      {reportType === 'profit' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Profit Trend */}
+          <div className="card p-6 xl:col-span-2">
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2 text-emerald-600" />
+              Profit Trend (Daily)
+            </h3>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={dailyProfitData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" stroke="#6b7280" fontSize={12} />
+                <YAxis stroke="#6b7280" fontSize={12} />
+                <Tooltip 
+                  formatter={(value: any, name: string) => {
+                    const labels: Record<string, string> = {
+                      revenue: 'Revenue',
+                      cogs: 'COGS',
+                      grossProfit: 'Gross Profit',
+                      expenses: 'Expenses',
+                      netProfit: 'Net Profit',
+                    };
+                    return [`${state.settings.currency} ${Number(value).toFixed(2)}`, labels[name] || name];
+                  }}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#2563EB" 
+                  strokeWidth={2} 
+                  name="Revenue"
+                  dot={{ r: 3 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="grossProfit" 
+                  stroke="#059669" 
+                  strokeWidth={2.5} 
+                  name="Gross Profit"
+                  dot={{ fill: '#059669', r: 3 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="expenses" 
+                  stroke="#DC2626" 
+                  strokeWidth={2} 
+                  name="Expenses"
+                  dot={{ fill: '#DC2626', r: 3 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="netProfit" 
+                  stroke="#7C3AED" 
+                  strokeWidth={3} 
+                  name="Net Profit"
+                  dot={{ fill: '#7C3AED', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Profit by Category */}
+          <div className="card p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+              <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+              Gross Profit by Category
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={profitData.categoryProfit.slice(0, 10)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis type="number" stroke="#6b7280" fontSize={12} />
+                <YAxis 
+                  type="category" 
+                  dataKey="name" 
+                  stroke="#6b7280" 
+                  fontSize={11} 
+                  width={100}
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip 
+                  formatter={(value: any, name: string) => {
+                    const labels: Record<string, string> = {
+                      revenue: 'Revenue',
+                      cogs: 'COGS',
+                      grossProfit: 'Gross Profit',
+                    };
+                    return [`${state.settings.currency} ${Number(value).toFixed(2)}`, labels[name] || name];
+                  }}
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="grossProfit" name="Gross Profit" fill="#059669" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Expense Breakdown */}
+          <div className="card p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+              <Receipt className="h-5 w-5 mr-2 text-rose-600" />
+              Expenses by Category
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={profitData.expenseByCategory.length > 0 ? profitData.expenseByCategory : [{ name: 'No Expenses', value: 1 }]}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {profitData.expenseByCategory.length > 0 
+                    ? profitData.expenseByCategory.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))
+                    : <Cell fill="#9CA3AF" />
+                  }
+                </Pie>
+                <Tooltip 
+                  formatter={(value: any) => profitData.expenseByCategory.length > 0 
+                    ? [`${state.settings.currency} ${Number(value).toFixed(2)}`, 'Expense']
+                    : [value, 'Status']
+                  }
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {/* Data Tables */}
       {reportType === 'sales' && (
         <div className="card overflow-hidden">
@@ -889,6 +1288,82 @@ export function ReportsManager() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {reportType === 'profit' && (
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center">
+              <PiggyBank className="h-5 w-5 mr-2 text-indigo-600" />
+              Product Profit Breakdown
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">Rank</th>
+                  <th className="table-header-cell">Product</th>
+                  <th className="table-header-cell">Category</th>
+                  <th className="table-header-cell">Qty Sold</th>
+                  <th className="table-header-cell">Revenue</th>
+                  <th className="table-header-cell">COGS</th>
+                  <th className="table-header-cell">Gross Profit</th>
+                  <th className="table-header-cell">Margin</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {profitData.productProfit.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="table-cell text-center py-12 text-gray-500">
+                      No sales data available for the selected date range
+                    </td>
+                  </tr>
+                ) : (
+                  profitData.productProfit.slice(0, 50).map((product, index) => (
+                    <tr key={product.id} className="table-row">
+                      <td className="table-cell">
+                        <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-emerald-500 to-indigo-600 text-white rounded-full font-bold text-sm">
+                          {index + 1}
+                        </div>
+                      </td>
+                      <td className="table-cell font-semibold text-gray-900">
+                        {product.name}
+                      </td>
+                      <td className="table-cell">
+                        <span className="badge badge-secondary">{product.category}</span>
+                      </td>
+                      <td className="table-cell">
+                        <span className="badge badge-info">{product.quantitySold}</span>
+                      </td>
+                      <td className="table-cell font-semibold text-blue-600">
+                        {state.settings.currency} {product.revenue.toFixed(2)}
+                      </td>
+                      <td className="table-cell text-gray-600">
+                        {state.settings.currency} {product.cogs.toFixed(2)}
+                      </td>
+                      <td className={`table-cell font-semibold ${
+                        product.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {state.settings.currency} {product.grossProfit.toFixed(2)}
+                      </td>
+                      <td className="table-cell">
+                        <span className={`font-semibold ${
+                          product.margin > 50 ? 'text-green-600' :
+                          product.margin > 20 ? 'text-orange-600' :
+                          product.margin > 0 ? 'text-yellow-600' :
+                          'text-red-600'
+                        }`}>
+                          {product.margin.toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

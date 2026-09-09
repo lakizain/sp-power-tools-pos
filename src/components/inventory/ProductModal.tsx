@@ -89,19 +89,22 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   }, [product]);
 
   const handleBarcodeScanKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!isScanningBarcode) return;
-
+    const target = e.target as HTMLElement;
+    const isBarcodeInputFocused = barcodeInputRef.current && target === barcodeInputRef.current;
+    const isScanModeActive = isScanningBarcode;
     const now = Date.now();
+
     if (now - lastScanKeyTimeRef.current > 100) {
       scanBufferRef.current = '';
     }
     lastScanKeyTimeRef.current = now;
 
     if (e.key === 'Enter') {
-      e.preventDefault();
-      e.stopPropagation();
       if (scanBufferRef.current.length >= 3) {
-        setFormData(prev => ({ ...prev, barcode: scanBufferRef.current.trim() }));
+        e.preventDefault();
+        e.stopPropagation();
+        const scannedBarcode = scanBufferRef.current.trim();
+        setFormData(prev => ({ ...prev, barcode: scannedBarcode }));
         setIsScanningBarcode(false);
         scanBufferRef.current = '';
         Swal.fire({
@@ -113,28 +116,43 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
           timer: 1500,
           timerProgressBar: true,
         });
+      } else if (isScanModeActive) {
+        scanBufferRef.current = '';
       }
       return;
     }
 
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const isFastInput = scanBufferRef.current.length > 0;
+      if ((isScanModeActive || isFastInput) && !isBarcodeInputFocused) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       scanBufferRef.current += e.key;
+      if (scanBufferRef.current.length >= 2 && !isScanningBarcode && !isBarcodeInputFocused) {
+        setIsScanningBarcode(true);
+      }
     }
   }, [isScanningBarcode]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    window.addEventListener('keydown', handleBarcodeScanKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleBarcodeScanKeyDown, true);
+    };
+  }, [isOpen, handleBarcodeScanKeyDown]);
+
+  useEffect(() => {
     if (isScanningBarcode) {
-      window.addEventListener('keydown', handleBarcodeScanKeyDown, true);
       barcodeInputRef.current?.focus();
       const timeout = setTimeout(() => {
         setIsScanningBarcode(false);
       }, 10000);
-      return () => {
-        window.removeEventListener('keydown', handleBarcodeScanKeyDown, true);
-        clearTimeout(timeout);
-      };
+      return () => clearTimeout(timeout);
     }
-  }, [isScanningBarcode, handleBarcodeScanKeyDown]);
+  }, [isScanningBarcode]);
 
   const startBarcodeScan = () => {
     setIsScanningBarcode(true);

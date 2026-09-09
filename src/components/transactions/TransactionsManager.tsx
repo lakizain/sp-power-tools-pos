@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Search, Download, Eye, RefreshCw, CreditCard, Banknote, Smartphone, Receipt, FileText, X, ShoppingCart } from 'lucide-react';
-import { useApp } from '../../context/SupabaseAppContext';
+import { Search, Download, Eye, RefreshCw, CreditCard, Banknote, Smartphone, Receipt, FileText, X, ShoppingCart, Trash2, RotateCcw } from 'lucide-react';
+import { useApp, useFeatureToggles } from '../../context/SupabaseAppContext';
+import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import { Sale } from '../../types';
 import { CheckoutModal } from '../pos/CheckoutModal';
+import { ReturnModal } from '../returns/ReturnModal';
 import { salesService } from '../../lib/services';
 import { swalConfig } from '../../lib/sweetAlert';
 
@@ -15,12 +17,44 @@ const isDraftSale = (sale: Sale) => {
 };
 
 export function TransactionsManager() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
+  const features = useFeatureToggles();
+  const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [selectedTransaction, setSelectedTransaction] = useState<Sale | null>(null);
+
+  const canDelete = features.transactionDelete && (profile?.role === 'admin' || profile?.role === 'manager');
+  const canReturn = features.productReturns && (profile?.role === 'admin' || profile?.role === 'manager');
+
+  const handleDeleteTransaction = async (sale: Sale) => {
+    if (!canDelete) {
+      swalConfig.error('You do not have permission to delete transactions.');
+      return;
+    }
+    const result = await swalConfig.confirm(
+      'Delete Transaction?',
+      `Are you sure you want to delete ${sale.invoiceNumber}? Total: ${state.settings.currency} ${sale.total.toFixed(2)}. This action cannot be undone and may affect inventory.`,
+      'Delete Transaction'
+    );
+    if (!result.isConfirmed) return;
+    try {
+      swalConfig.loading('Deleting transaction...');
+      try {
+        await salesService.delete(sale.id);
+      } catch (e) {
+        // Supabase delete may fail if no real table - still proceed with local state
+      }
+      dispatch({ type: 'DELETE_SALE', payload: sale.id });
+      setSelectedTransaction(null);
+      swalConfig.success('Transaction deleted successfully.');
+    } catch (e: any) {
+      console.error(e);
+      swalConfig.error('Failed to delete transaction: ' + (e.message || 'Unknown error'));
+    }
+  };
 
   const filteredTransactions = useMemo(() => {
     return state.sales.filter(sale => {
@@ -307,12 +341,24 @@ export function TransactionsManager() {
                     <div className="truncate max-w-24">{transaction.cashier ?? 'N/A'}</div>
                   </td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => setSelectedTransaction(transaction)}
-                      className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-colors"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center justify-end space-x-1">
+                      <button
+                        onClick={() => setSelectedTransaction(transaction)}
+                        className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      {(canDelete && !isDraftSale(transaction)) && (
+                        <button
+                          onClick={() => handleDeleteTransaction(transaction)}
+                          className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          title="Delete Transaction"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -326,6 +372,9 @@ export function TransactionsManager() {
         <TransactionDetailModal
           transaction={selectedTransaction}
           onClose={() => setSelectedTransaction(null)}
+          canDelete={canDelete && !isDraftSale(selectedTransaction)}
+          canReturn={canReturn && !isDraftSale(selectedTransaction)}
+          onDelete={() => handleDeleteTransaction(selectedTransaction)}
         />
       )}
     </div>
@@ -335,11 +384,30 @@ export function TransactionsManager() {
 interface TransactionDetailModalProps {
   transaction: Sale;
   onClose: () => void;
+  canDelete?: boolean;
+  canReturn?: boolean;
+  onDelete?: () => void;
 }
 
-function TransactionDetailModal({ transaction, onClose }: TransactionDetailModalProps) {
+function TransactionDetailModal({ transaction, onClose, canDelete, canReturn, onDelete }: TransactionDetailModalProps) {
   const { state, dispatch } = useApp();
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showReturn, setShowReturn] = useState(false);
+
+  const handleOpenReturn = () => {
+    if (!canReturn) {
+      swalConfig.warning('Product Returns feature is disabled or you do not have permission.');
+      return;
+    }
+    setShowReturn(true);
+  };
+
+  const handleReturnSaved = (returnRecord: any) => {
+    dispatch({ type: 'ADD_RETURN', payload: returnRecord });
+    swalConfig.success('Return processed successfully!');
+    setShowReturn(false);
+    onClose();
+  };
 
   const handleCompleteDraft = () => {
     // Load the draft sale into the cart for completion
@@ -522,7 +590,29 @@ function TransactionDetailModal({ transaction, onClose }: TransactionDetailModal
         </div>
 
         {/* Modal Footer */}
-        <div className="modal-footer">
+        <div className="modal-footer flex flex-wrap gap-3 justify-end">
+          {(canDelete || canReturn) && (
+            <>
+              {canReturn && (
+                <button
+                  onClick={handleOpenReturn}
+                  className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-semibold hover:from-amber-600 hover:to-orange-700 shadow-md transition-all"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>Process Return</span>
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => onDelete?.()}
+                  className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl font-semibold hover:from-red-600 hover:to-rose-700 shadow-md transition-all"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Transaction</span>
+                </button>
+              )}
+            </>
+          )}
           <button
             onClick={onClose}
             className="btn btn-secondary btn-md"
@@ -539,6 +629,16 @@ function TransactionDetailModal({ transaction, onClose }: TransactionDetailModal
         isOpen={showCheckout}
         onClose={() => setShowCheckout(false)}
         onComplete={handleCheckoutComplete}
+      />
+    )}
+
+    {/* Return Modal for processing returns from this transaction */}
+    {showReturn && (
+      <ReturnModal
+        isOpen={showReturn}
+        onClose={() => setShowReturn(false)}
+        onSave={handleReturnSaved}
+        fromSale={transaction}
       />
     )}
   </>

@@ -13,13 +13,14 @@ interface BarcodeStickerPrintProps {
 export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
   const { state } = useApp();
   const [stickerCount, setStickerCount] = useState(1);
-  const [stickerSize, setStickerSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [stickerSize, setStickerSize] = useState<'small' | 'medium' | 'large' | '38x25mm'>('38x25mm');
   const stickerCanvasesRef = useRef<Map<number, HTMLCanvasElement>>(new Map());
 
   const stickerDimensions = {
     small: { width: 200, height: 100, productFontSize: 10, priceFontSize: 12, barcodeHeight: 35, fontSize: 9 },
     medium: { width: 280, height: 140, productFontSize: 12, priceFontSize: 16, barcodeHeight: 50, fontSize: 11 },
     large: { width: 380, height: 180, productFontSize: 14, priceFontSize: 20, barcodeHeight: 65, fontSize: 13 },
+    '38x25mm': { width: 140, height: 92, productFontSize: 9, priceFontSize: 10, barcodeHeight: 38, fontSize: 8 },
   };
 
   useEffect(() => {
@@ -27,11 +28,15 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     const dims = stickerDimensions[stickerSize];
     stickerCanvasesRef.current.forEach((canvas, index) => {
       if (canvas) {
+        if (stickerSize === '38x25mm') {
+          canvas.width = dims.width;
+          canvas.height = dims.barcodeHeight + dims.fontSize + 6;
+        }
         renderBarcodeToCanvas(canvas, product.barcode!, {
           height: dims.barcodeHeight,
           fontSize: dims.fontSize,
-          width: stickerSize === 'small' ? 1 : stickerSize === 'medium' ? 1.5 : 2,
-          margin: 4,
+          width: stickerSize === 'small' ? 1 : stickerSize === '38x25mm' ? 1.1 : stickerSize === 'medium' ? 1.5 : 2,
+          margin: stickerSize === '38x25mm' ? 0 : 4,
         });
       }
     });
@@ -45,11 +50,15 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     const dims = stickerDimensions[stickerSize];
     stickerCanvasesRef.current.forEach((canvas, index) => {
       if (canvas && product?.barcode && index >= 10000) {
+        if (stickerSize === '38x25mm') {
+          canvas.width = dims.width;
+          canvas.height = dims.barcodeHeight + dims.fontSize + 6;
+        }
         renderBarcodeToCanvas(canvas, product.barcode!, {
           height: dims.barcodeHeight,
           fontSize: dims.fontSize,
-          width: stickerSize === 'small' ? 1 : stickerSize === 'medium' ? 1.5 : 2,
-          margin: 4,
+          width: stickerSize === 'small' ? 1 : stickerSize === '38x25mm' ? 1.1 : stickerSize === 'medium' ? 1.5 : 2,
+          margin: stickerSize === '38x25mm' ? 0 : 4,
         });
       }
     });
@@ -65,7 +74,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
       clonedPrintArea.style.left = '0';
       clonedPrintArea.style.top = '0';
       clonedPrintArea.style.width = '100%';
-      clonedPrintArea.style.padding = '16px 32px';
+      clonedPrintArea.style.padding = stickerSize === '38x25mm' ? '0' : '16px 32px';
       clonedPrintArea.style.zIndex = '99999';
       clonedPrintArea.style.background = '#ffffff';
 
@@ -78,6 +87,12 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           const ctx = target.getContext('2d');
           target.width = source.width;
           target.height = source.height;
+          if (stickerSize === '38x25mm') {
+            target.setAttribute('width', String(source.width));
+            target.setAttribute('height', String(source.height));
+            target.style.width = '37mm';
+            target.style.height = 'auto';
+          }
           if (ctx) {
             ctx.drawImage(source, 0, 0);
           }
@@ -138,9 +153,10 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
               </label>
               <select
                 value={stickerSize}
-                onChange={(e) => setStickerSize(e.target.value as 'small' | 'medium' | 'large')}
+                onChange={(e) => setStickerSize(e.target.value as 'small' | 'medium' | 'large' | '38x25mm')}
                 className="select w-full"
               >
+                <option value="38x25mm">38mm × 25mm (Label Roll)</option>
                 <option value="small">Small (2" × 1")</option>
                 <option value="medium">Medium (2.8" × 1.4")</option>
                 <option value="large">Large (3.8" × 1.8")</option>
@@ -234,43 +250,84 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           </div>
         </div>
 
-        <div id="sticker-print-area" className="hidden print:block px-8 py-4">
-          <div
-            className="grid gap-2 p-2"
-            style={{
-              gridTemplateColumns: `repeat(auto-fill, minmax(${dims.width}px, 1fr))`,
-              pageBreakInside: 'avoid',
-            }}
-          >
-            {Array.from({ length: stickerCount }, (_, i) => (
-              <div
-                key={`print-${i}`}
-                className="border border-gray-400 rounded p-1 flex flex-col items-center justify-between break-inside-avoid"
-                style={{
-                  width: `${dims.width}px`,
-                  height: `${dims.height}px`,
-                  pageBreakInside: 'avoid',
-                }}
-              >
+        <div id="sticker-print-area" className="hidden print:block">
+          {stickerSize === '38x25mm' ? (
+            <div>
+              {Array.from({ length: stickerCount }, (_, i) => (
                 <div
-                  className="text-center font-semibold text-black leading-tight w-full truncate px-1"
-                  style={{ fontSize: `${dims.productFontSize}px` }}
+                  key={`print-${i}`}
+                  className="label"
                 >
-                  {product.name}
+                  <div
+                    className="flex flex-col items-center justify-between"
+                    style={{
+                      width: '38mm',
+                      height: '25mm',
+                      padding: '0.5mm',
+                      boxSizing: 'border-box',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      className="text-center font-semibold text-black leading-tight w-full truncate"
+                      style={{ fontSize: `${dims.productFontSize}px`, lineHeight: 1.1 }}
+                    >
+                      {product.name}
+                    </div>
+                    <canvas
+                      ref={setCanvasRef(i + 10000)}
+                      width={dims.width}
+                      height={dims.barcodeHeight + dims.fontSize + 6}
+                      style={{ width: '37mm', height: 'auto', maxWidth: '100%', display: 'block' }}
+                    />
+                    <div
+                      className="text-center font-bold text-black"
+                      style={{ fontSize: `${dims.priceFontSize}px`, lineHeight: 1 }}
+                    >
+                      {displayPrice}
+                    </div>
+                  </div>
                 </div>
-                <canvas
-                  ref={setCanvasRef(i + 10000)}
-                  style={{ maxWidth: '100%', height: `${dims.barcodeHeight + 20}px` }}
-                />
+              ))}
+            </div>
+          ) : (
+            <div
+              className="grid gap-2 p-2"
+              style={{
+                gridTemplateColumns: `repeat(auto-fill, minmax(${dims.width}px, 1fr))`,
+                pageBreakInside: 'avoid',
+              }}
+            >
+              {Array.from({ length: stickerCount }, (_, i) => (
                 <div
-                  className="text-center font-bold text-black"
-                  style={{ fontSize: `${dims.priceFontSize}px` }}
+                  key={`print-${i}`}
+                  className="border border-gray-400 rounded p-1 flex flex-col items-center justify-between break-inside-avoid"
+                  style={{
+                    width: `${dims.width}px`,
+                    height: `${dims.height}px`,
+                    pageBreakInside: 'avoid',
+                  }}
                 >
-                  {displayPrice}
+                  <div
+                    className="text-center font-semibold text-black leading-tight w-full truncate px-1"
+                    style={{ fontSize: `${dims.productFontSize}px` }}
+                  >
+                    {product.name}
+                  </div>
+                  <canvas
+                    ref={setCanvasRef(i + 10000)}
+                    style={{ maxWidth: '100%', height: `${dims.barcodeHeight + 20}px` }}
+                  />
+                  <div
+                    className="text-center font-bold text-black"
+                    style={{ fontSize: `${dims.priceFontSize}px` }}
+                  >
+                    {displayPrice}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="modal-footer no-print">
@@ -315,9 +372,24 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
               #sticker-print-area-clone * {
                 visibility: visible !important;
               }
-              @page {
-                margin: 0.5cm;
-              }
+              ${stickerSize === '38x25mm' ? `
+                @page {
+                  size: 38mm 25mm;
+                  margin: 0;
+                }
+                .label {
+                  width: 38mm;
+                  height: 25mm;
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+                  page-break-after: always;
+                }
+              ` : `
+                @page {
+                  margin: 0.5cm;
+                }
+              `}
             }
           `}
         </style>

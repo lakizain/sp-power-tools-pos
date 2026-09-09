@@ -291,11 +291,13 @@ $$ LANGUAGE plpgsql;
 -- ================================================================
 
 -- Trigger to update updated_at for exchange_rates
+DROP TRIGGER IF EXISTS update_exchange_rates_updated_at ON exchange_rates;
 CREATE TRIGGER update_exchange_rates_updated_at 
     BEFORE UPDATE ON exchange_rates 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger to update updated_at for currency_config
+DROP TRIGGER IF EXISTS update_currency_config_updated_at ON currency_config;
 CREATE TRIGGER update_currency_config_updated_at 
     BEFORE UPDATE ON currency_config 
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -502,31 +504,37 @@ ALTER TABLE currency_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exchange_rate_history ENABLE ROW LEVEL SECURITY;
 
 -- Exchange rates policies (readable by all authenticated users, writable by authenticated users)
+DROP POLICY IF EXISTS "Exchange rates are viewable by authenticated users" ON exchange_rates;
 CREATE POLICY "Exchange rates are viewable by authenticated users" ON exchange_rates FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Exchange rates are editable by authenticated users" ON exchange_rates;
 CREATE POLICY "Exchange rates are editable by authenticated users" ON exchange_rates FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Currency config policies (readable by all authenticated users, writable by authenticated users)
+DROP POLICY IF EXISTS "Currency config is viewable by authenticated users" ON currency_config;
 CREATE POLICY "Currency config is viewable by authenticated users" ON currency_config FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Currency config is editable by authenticated users" ON currency_config;
 CREATE POLICY "Currency config is editable by authenticated users" ON currency_config FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Exchange rate history policies (readable by all authenticated users, writable by authenticated users)
+DROP POLICY IF EXISTS "Exchange rate history is viewable by authenticated users" ON exchange_rate_history;
 CREATE POLICY "Exchange rate history is viewable by authenticated users" ON exchange_rate_history FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Exchange rate history is editable by authenticated users" ON exchange_rate_history;
 CREATE POLICY "Exchange rate history is editable by authenticated users" ON exchange_rate_history FOR ALL USING (
     auth.role () = 'authenticated'
 );

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
 import {
-  Product, Customer, Sale, User, Discount, CartItem, AppSettings, SalesTab, DiscountCondition, AppliedDiscount, CardDetails
+  Product, Customer, Sale, User, Discount, CartItem, AppSettings, SalesTab, DiscountCondition, AppliedDiscount, CardDetails,
+  Supplier, Expense, ProductReturn, OutstandingPayment, FeatureToggles, Rental
 } from '../types';
 import { useAuth } from './AuthContext';
 import {
@@ -10,8 +11,20 @@ import {
   discountsService,
   settingsService,
   usersService,
-  salesTabsService
+  salesTabsService,
+  rentalsService
 } from '../lib/services';
+
+const defaultFeatureToggles: FeatureToggles = {
+  transactionDelete: true,
+  productReturns: true,
+  outstandingPayments: true,
+  productDiscount: true,
+  expenseTracking: true,
+  supplierManagement: true,
+  alertMonitoring: true,
+  productRentals: true,
+};
 
 interface AppState {
   products: Product[];
@@ -19,6 +32,11 @@ interface AppState {
   sales: Sale[];
   users: User[];
   discounts: Discount[];
+  suppliers: Supplier[];
+  expenses: Expense[];
+  returns: ProductReturn[];
+  outstandingPayments: OutstandingPayment[];
+  rentals: Rental[];
   cart: CartItem[];
   currentUser: User | null;
   settings: AppSettings;
@@ -61,7 +79,32 @@ type AppAction =
   | { type: 'UPDATE_SALES_TAB'; payload: { id: string; updates: Partial<SalesTab> } }
   | { type: 'REMOVE_SALES_TAB'; payload: string }
   | { type: 'SET_ACTIVE_SALES_TAB'; payload: string }
-  | { type: 'SET_SALES_TABS'; payload: SalesTab[] };
+  | { type: 'SET_SALES_TABS'; payload: SalesTab[] }
+  // Suppliers
+  | { type: 'SET_SUPPLIERS'; payload: Supplier[] }
+  | { type: 'ADD_SUPPLIER'; payload: Supplier }
+  | { type: 'UPDATE_SUPPLIER'; payload: Supplier }
+  | { type: 'DELETE_SUPPLIER'; payload: string }
+  // Expenses
+  | { type: 'SET_EXPENSES'; payload: Expense[] }
+  | { type: 'ADD_EXPENSE'; payload: Expense }
+  | { type: 'UPDATE_EXPENSE'; payload: Expense }
+  | { type: 'DELETE_EXPENSE'; payload: string }
+  // Product Returns
+  | { type: 'SET_RETURNS'; payload: ProductReturn[] }
+  | { type: 'ADD_RETURN'; payload: ProductReturn }
+  | { type: 'UPDATE_RETURN'; payload: ProductReturn }
+  | { type: 'DELETE_RETURN'; payload: string }
+  // Outstanding Payments
+  | { type: 'SET_OUTSTANDING_PAYMENTS'; payload: OutstandingPayment[] }
+  | { type: 'ADD_OUTSTANDING_PAYMENT'; payload: OutstandingPayment }
+  | { type: 'UPDATE_OUTSTANDING_PAYMENT'; payload: OutstandingPayment }
+  | { type: 'DELETE_OUTSTANDING_PAYMENT'; payload: string }
+  // Rentals
+  | { type: 'SET_RENTALS'; payload: Rental[] }
+  | { type: 'ADD_RENTAL'; payload: Rental }
+  | { type: 'UPDATE_RENTAL'; payload: Rental }
+  | { type: 'DELETE_RENTAL'; payload: string };
 
 const initialState: AppState = {
   products: [],
@@ -69,11 +112,16 @@ const initialState: AppState = {
   sales: [],
   users: [],
   discounts: [],
+  suppliers: [],
+  expenses: [],
+  returns: [],
+  outstandingPayments: [],
+  rentals: [],
   cart: [],
   currentUser: null,
   selectedCustomer: null,
   settings: {
-    storeName: 'SIX PLUS 2025 POS',
+    storeName: 'S&P POWER TOOLS',
     storeAddress: '123 Business Street, Colombo 03, Sri Lanka',
     storePhone: '+94 11 234 5678',
     storeEmail: 'info@sekalabs.lk',
@@ -85,6 +133,7 @@ const initialState: AppState = {
     theme: 'light',
     invoicePrefix: 'INV',
     invoiceCounter: 1000,
+    featureToggles: defaultFeatureToggles,
   },
   salesTabs: [],
   activeSalesTab: '',
@@ -218,6 +267,81 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'SET_SALES_TABS':
       return { ...state, salesTabs: action.payload };
+    // Suppliers
+    case 'SET_SUPPLIERS':
+      return { ...state, suppliers: action.payload };
+    case 'ADD_SUPPLIER':
+      return { ...state, suppliers: [...state.suppliers, action.payload] };
+    case 'UPDATE_SUPPLIER':
+      return {
+        ...state,
+        suppliers: state.suppliers.map(s => s.id === action.payload.id ? action.payload : s),
+      };
+    case 'DELETE_SUPPLIER':
+      return {
+        ...state,
+        suppliers: state.suppliers.filter(s => s.id !== action.payload),
+      };
+    // Expenses
+    case 'SET_EXPENSES':
+      return { ...state, expenses: action.payload };
+    case 'ADD_EXPENSE':
+      return { ...state, expenses: [...state.expenses, action.payload] };
+    case 'UPDATE_EXPENSE':
+      return {
+        ...state,
+        expenses: state.expenses.map(e => e.id === action.payload.id ? action.payload : e),
+      };
+    case 'DELETE_EXPENSE':
+      return {
+        ...state,
+        expenses: state.expenses.filter(e => e.id !== action.payload),
+      };
+    // Product Returns
+    case 'SET_RETURNS':
+      return { ...state, returns: action.payload };
+    case 'ADD_RETURN':
+      return { ...state, returns: [...state.returns, action.payload] };
+    case 'UPDATE_RETURN':
+      return {
+        ...state,
+        returns: state.returns.map(r => r.id === action.payload.id ? action.payload : r),
+      };
+    case 'DELETE_RETURN':
+      return {
+        ...state,
+        returns: state.returns.filter(r => r.id !== action.payload),
+      };
+    // Outstanding Payments
+    case 'SET_OUTSTANDING_PAYMENTS':
+      return { ...state, outstandingPayments: action.payload };
+    case 'ADD_OUTSTANDING_PAYMENT':
+      return { ...state, outstandingPayments: [...state.outstandingPayments, action.payload] };
+    case 'UPDATE_OUTSTANDING_PAYMENT':
+      return {
+        ...state,
+        outstandingPayments: state.outstandingPayments.map(p => p.id === action.payload.id ? action.payload : p),
+      };
+    case 'DELETE_OUTSTANDING_PAYMENT':
+      return {
+        ...state,
+        outstandingPayments: state.outstandingPayments.filter(p => p.id !== action.payload),
+      };
+    // Rentals
+    case 'SET_RENTALS':
+      return { ...state, rentals: action.payload };
+    case 'ADD_RENTAL':
+      return { ...state, rentals: [...state.rentals, action.payload] };
+    case 'UPDATE_RENTAL':
+      return {
+        ...state,
+        rentals: state.rentals.map(r => r.id === action.payload.id ? action.payload : r),
+      };
+    case 'DELETE_RENTAL':
+      return {
+        ...state,
+        rentals: state.rentals.filter(r => r.id !== action.payload),
+      };
     default:
       return state;
   }
@@ -246,6 +370,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_USERS', payload: [] });
       dispatch({ type: 'SET_DISCOUNTS', payload: [] });
       dispatch({ type: 'SET_SALES_TABS', payload: [] });
+      dispatch({ type: 'SET_RENTALS', payload: [] });
       dispatch({ type: 'CLEAR_CART' });
       dispatch({ type: 'SET_CURRENT_USER', payload: null });
       setInitialized(false);
@@ -270,7 +395,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         discounts,
         settings,
         users,
-        salesTabs
+        salesTabs,
+        rentals
       ] = await Promise.all([
         productsService.getAll(),
         customersService.getAll(),
@@ -278,7 +404,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         discountsService.getAll(),
         settingsService.get(),
         usersService.getAll(),
-        user ? salesTabsService.getByUserId(user.id) : Promise.resolve([])
+        user ? salesTabsService.getByUserId(user.id) : Promise.resolve([]),
+        rentalsService.getAll().catch((e) => { console.warn('Rentals not loaded yet (migration pending):', e.message); return []; })
       ]);
 
       dispatch({ type: 'SET_PRODUCTS', payload: products });
@@ -288,6 +415,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_SETTINGS', payload: settings });
       dispatch({ type: 'SET_USERS', payload: users });
       dispatch({ type: 'SET_SALES_TABS', payload: salesTabs });
+      dispatch({ type: 'SET_RENTALS', payload: rentals });
 
       // Create initial sales tab if none exist
       if (salesTabs.length === 0 && user) {
@@ -455,4 +583,18 @@ export function useInvoiceStats() {
       nextInvoiceNumber,
     };
   };
+}
+
+// Get feature toggles with defaults guaranteed
+export function getFeatureToggles(settings: AppSettings): FeatureToggles {
+  return {
+    ...defaultFeatureToggles,
+    ...(settings.featureToggles || {}),
+  };
+}
+
+// Hook to access feature toggles easily
+export function useFeatureToggles() {
+  const { state } = useApp();
+  return getFeatureToggles(state.settings);
 }

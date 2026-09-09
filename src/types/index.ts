@@ -55,6 +55,16 @@ export interface Supplier {
   paymentTerms: string;
   rating: number;
   createdAt: Date;
+  contactPerson?: string;
+  phone2?: string;
+  website?: string;
+  bankDetails?: Record<string, any> | string;
+  taxId?: string;
+  notes?: string;
+  totalPurchases?: number;
+  outstandingBalance?: number;
+  updatedAt?: Date;
+  active?: boolean;
 }
 
 export interface CartItem {
@@ -177,6 +187,154 @@ export interface AppSettings {
   exchangeRateProvider?: 'fixer' | 'currencylayer' | 'exchangerate' | 'manual';
   exchangeRateApiKey?: string;
   exchangeRateUpdateInterval?: number; // in minutes
+  // Optional feature toggles
+  featureToggles?: FeatureToggles;
+}
+
+export interface FeatureToggles {
+  transactionDelete: boolean;
+  productReturns: boolean;
+  outstandingPayments: boolean;
+  productDiscount: boolean;
+  expenseTracking: boolean;
+  supplierManagement: boolean;
+  alertMonitoring: boolean;
+  productRentals: boolean;
+}
+
+export interface Expense {
+  id: string;
+  category: string;
+  subcategory?: string;
+  description: string;
+  amount: number;
+  currency?: string;
+  date: Date;
+  paymentMethod: 'cash' | 'card' | 'digital' | 'bank_transfer' | 'check' | 'digital_wallet' | 'other';
+  receiptNumber?: string;
+  referenceNumber?: string;
+  supplierId?: string;
+  supplierName?: string;
+  status?: 'pending' | 'approved' | 'reimbursed' | 'archived';
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+  attachmentUrl?: string;
+  attachments?: string[];
+}
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  budget?: number;
+}
+
+export interface ProductReturn {
+  id: string;
+  saleId: string;
+  invoiceNumber: string;
+  customerId?: string;
+  customerName?: string;
+  returnNumber?: string;
+  itemsCount?: number;
+  items: ReturnItem[];
+  subtotal: number;
+  taxAmount: number;
+  totalRefund: number;
+  reason: string;
+  returnMethod: 'refund' | 'exchange' | 'store_credit' | 'rental_return';
+  paymentMethod?: string;
+  status: 'pending' | 'approved' | 'completed' | 'rejected' | 'exchanged';
+  processedBy: string;
+  processedAt?: Date;
+  restocked?: boolean;
+  createdBy?: string;
+  timestamp: Date;
+  createdAt?: Date;
+  notes?: string;
+}
+
+export interface ReturnItem {
+  id?: string;
+  productId: string;
+  productName: string;
+  sku?: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  taxRate?: number;
+  taxAmount?: number;
+  reason?: string;
+  condition: 'new' | 'unused' | 'opened' | 'used' | 'damaged' | 'defective' | 'missing_parts';
+  notes?: string;
+}
+
+export interface OutstandingPayment {
+  id: string;
+  customerId: string;
+  customerName: string;
+  saleId: string;
+  invoiceNumber: string;
+  totalAmount: number;
+  paidAmount: number;
+  outstandingAmount: number;
+  dueDate: Date;
+  issueDate: Date;
+  status: 'pending' | 'overdue' | 'partial' | 'paid';
+  paymentHistory: PaymentRecord[];
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  date: Date;
+  method: 'cash' | 'card' | 'digital' | 'bank_transfer' | 'check' | 'digital_wallet' | 'other';
+  currency?: string;
+  receiptUrl?: string;
+  reference?: string;
+  receivedBy: string;
+  notes?: string;
+}
+
+// ===== Rental Management =====
+export type RentalStatus = 'active' | 'overdue' | 'returned' | 'lost' | 'damaged';
+
+export interface RentalItem {
+  id?: string;
+  productId: string;
+  productName: string;
+  sku?: string;
+  quantity: number;
+  dailyRate: number;
+  subtotal: number;
+  condition?: 'new' | 'unused' | 'opened' | 'used' | 'damaged' | 'defective' | 'missing_parts';
+  notes?: string;
+}
+
+export interface Rental {
+  id: string;
+  rentalNumber: string;
+  customerId?: string;
+  customerName?: string;
+  items: RentalItem[];
+  rentFrom: Date;
+  rentTo: Date;
+  dailyRate: number;
+  weeklyRate?: number;
+  securityDeposit: number;
+  totalRent: number;
+  paidAmount: number;
+  status: RentalStatus;
+  notes?: string;
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface LoginCredentials {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Plus, Minus, User, Percent, FileText, ShoppingCart } from 'lucide-react';
 import { CartItem, Customer } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
@@ -265,6 +265,8 @@ function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [discountValue, setDiscountValue] = useState('');
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+  const [quantityInput, setQuantityInput] = useState(item.quantity.toString());
+  const [isEditingQuantity, setIsEditingQuantity] = useState(false);
 
   const handleDiscountSubmit = () => {
     const value = parseFloat(discountValue);
@@ -274,6 +276,45 @@ function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount
       setDiscountValue('');
     }
   };
+
+  const handleQuantityInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuantityInput(e.target.value);
+  };
+
+  const handleQuantityInputBlur = () => {
+    const parsed = parseInt(quantityInput);
+    if (!isNaN(parsed) && parsed >= 0) {
+      if (parsed === 0) {
+        onRemove(index);
+      } else {
+        const maxStock = item.product.trackInventory ? item.product.stock : Infinity;
+        const clamped = Math.min(parsed, maxStock);
+        if (clamped !== item.quantity) {
+          onUpdateQuantity(index, clamped);
+        }
+        setQuantityInput(clamped.toString());
+      }
+    } else {
+      setQuantityInput(item.quantity.toString());
+    }
+    setIsEditingQuantity(false);
+  };
+
+  const handleQuantityInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setQuantityInput(item.quantity.toString());
+      setIsEditingQuantity(false);
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  useEffect(() => {
+    if (!isEditingQuantity) {
+      setQuantityInput(item.quantity.toString());
+    }
+  }, [item.quantity, isEditingQuantity]);
 
   const unitPrice = item.product.isWeightBased
     ? (item.product.pricePerUnit || 0)
@@ -313,22 +354,29 @@ function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount
         <div className="flex items-center space-x-0.5">
           <button
             onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-            className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors flex-shrink-0"
           >
             <Minus className="h-2.5 w-2.5" />
           </button>
-          <span className="font-semibold min-w-[1.25rem] text-center text-[12px] text-gray-900 leading-none">
-            {item.quantity}
-          </span>
+          <input
+            type="number"
+            min="1"
+            value={quantityInput}
+            onChange={handleQuantityInputChange}
+            onBlur={handleQuantityInputBlur}
+            onKeyDown={handleQuantityInputKeyDown}
+            onFocus={() => setIsEditingQuantity(true)}
+            className="w-8 h-5 text-center text-[11px] font-semibold text-gray-900 bg-gray-50 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+          />
           <button
             onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-            className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+            className="w-5 h-5 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors flex-shrink-0"
           >
             <Plus className="h-2.5 w-2.5" />
           </button>
           <button
             onClick={() => setShowDiscountInput(!showDiscountInput)}
-            className={`ml-1 w-5 h-5 flex items-center justify-center rounded transition-colors ${
+            className={`ml-1 w-5 h-5 flex items-center justify-center rounded transition-colors flex-shrink-0 ${
               showDiscountInput
                 ? 'bg-blue-100 text-blue-700'
                 : 'bg-blue-50 text-blue-500 hover:bg-blue-100 hover:text-blue-700'

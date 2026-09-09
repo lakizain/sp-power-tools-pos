@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "SIX PLUS 2025 - A modern POS system built with React and Supabase",
+  "description": "S&P POWER TOOLS - A modern POS system built with React and Supabase",
   "keywords": [
     "react",
     "supabase",
@@ -11,10 +11,10 @@
     "point-of-sale",
     "system",
     "ecommerce",
-    "six-plus",
-    "2025"
+    "s-p-power-tools",
+    "power-tools"
   ],
-  "author": "SIX PLUS 2025 <info@sekalabs.lk>",
+  "author": "S&P POWER TOOLS <info@sekalabs.lk>",
   "repository": {
     "type": "git",
     "url": "git@github.com:Keshara1997/POS-system.git"

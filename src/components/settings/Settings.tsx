@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Store, DollarSign, Printer, Users, Globe, FileText, Lock, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
-import { useApp, useInvoiceStats } from '../../context/SupabaseAppContext';
+import { Save, Store, DollarSign, Printer, Users, Globe, FileText, Lock, RefreshCw, Settings as SettingsIcon, ToggleLeft, ToggleRight } from 'lucide-react';
+import { useApp, useInvoiceStats, getFeatureToggles } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { LogoUpload } from './LogoUpload';
 import { swalConfig } from '../../lib/sweetAlert';
 import { CurrencyUtils, getSupportedCurrencies } from '../../lib/currencyUtils';
 import { exchangeRateService, testExchangeRateConnection } from '../../lib/exchangeRateService';
-import { CurrencyConfig } from '../../types';
+import { CurrencyConfig, FeatureToggles } from '../../types';
 import { ExchangeRateManager } from './ExchangeRateManager';
 
 export function Settings() {
@@ -14,23 +14,27 @@ export function Settings() {
   const { profile } = useAuth();
   const getInvoiceStats = useInvoiceStats();
   const invoiceStats = getInvoiceStats();
-  const [formData, setFormData] = useState({
-    storeName: state.settings.storeName,
-    storeAddress: state.settings.storeAddress,
-    storePhone: state.settings.storePhone || '',
-    storeEmail: state.settings.storeEmail || '',
-    storeLogo: state.settings.storeLogo,
-    taxRate: state.settings.taxRate.toString(),
-    currency: state.settings.currency,
-    baseCurrency: state.settings.baseCurrency || 'USD',
-    receiptPrinter: state.settings.receiptPrinter,
-    autoBackup: state.settings.autoBackup,
-    theme: state.settings.theme || 'light',
-    invoicePrefix: state.settings.invoicePrefix || 'INV',
-    invoiceCounter: state.settings.invoiceCounter?.toString() || '1000',
-    exchangeRateProvider: state.settings.exchangeRateProvider || 'exchangerate',
-    exchangeRateApiKey: state.settings.exchangeRateApiKey || '',
-    exchangeRateUpdateInterval: state.settings.exchangeRateUpdateInterval?.toString() || '60',
+  const [formData, setFormData] = useState(() => {
+    const featureToggles = getFeatureToggles(state.settings);
+    return {
+      storeName: state.settings.storeName,
+      storeAddress: state.settings.storeAddress,
+      storePhone: state.settings.storePhone || '',
+      storeEmail: state.settings.storeEmail || '',
+      storeLogo: state.settings.storeLogo,
+      taxRate: state.settings.taxRate.toString(),
+      currency: state.settings.currency,
+      baseCurrency: state.settings.baseCurrency || 'USD',
+      receiptPrinter: state.settings.receiptPrinter,
+      autoBackup: state.settings.autoBackup,
+      theme: state.settings.theme || 'light',
+      invoicePrefix: state.settings.invoicePrefix || 'INV',
+      invoiceCounter: state.settings.invoiceCounter?.toString() || '1000',
+      exchangeRateProvider: state.settings.exchangeRateProvider || 'exchangerate',
+      exchangeRateApiKey: state.settings.exchangeRateApiKey || '',
+      exchangeRateUpdateInterval: state.settings.exchangeRateUpdateInterval?.toString() || '60',
+      featureToggles,
+    };
   });
 
   // Currency-related state
@@ -119,6 +123,17 @@ export function Settings() {
     setFormData(prev => ({ ...prev, storeLogo: logo }));
   };
 
+  const handleFeatureToggle = (key: keyof FeatureToggles, value: boolean) => {
+    if (!canEditSettings) return;
+    setFormData(prev => ({
+      ...prev,
+      featureToggles: {
+        ...prev.featureToggles,
+        [key]: value,
+      },
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -135,6 +150,7 @@ export function Settings() {
         taxRate: parseFloat(formData.taxRate),
         invoiceCounter: parseInt(formData.invoiceCounter),
         exchangeRateUpdateInterval: parseInt(formData.exchangeRateUpdateInterval),
+        featureToggles: formData.featureToggles,
       };
 
       await settingsService.update(updatedSettings);
@@ -578,6 +594,65 @@ export function Settings() {
                   <p className="text-xs text-gray-600">Automatically backup data to local storage</p>
                 </div>
               </label>
+            </div>
+          </div>
+
+          {/* Optional Features */}
+          <div className="space-y-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="bg-teal-100 p-2 rounded-xl">
+                <SettingsIcon className="h-6 w-6 text-teal-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Optional Features</h2>
+                <p className="text-sm text-gray-600">Enable or disable optional modules for your POS system</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {([
+                { key: 'transactionDelete', label: 'Transaction Delete', description: 'Allow managers/admins to delete completed transactions' },
+                { key: 'productReturns', label: 'Product Returns', description: 'Process customer returns, exchanges, and refunds' },
+                { key: 'outstandingPayments', label: 'Outstanding Payments', description: 'Track customer credit and outstanding invoices' },
+                { key: 'productDiscount', label: 'Product Discounts', description: 'Create and manage discount campaigns and promotions' },
+                { key: 'expenseTracking', label: 'Expense Tracking', description: 'Record and categorize business expenses' },
+                { key: 'supplierManagement', label: 'Supplier Management', description: 'Manage supplier information and purchase history' },
+                { key: 'alertMonitoring', label: 'Alert Monitoring', description: 'Configure and track system alerts and notifications' },
+                { key: 'productRentals', label: 'Product Rentals', description: 'Track rented items, customers, rental periods, and returns' },
+              ] as { key: keyof FeatureToggles; label: string; description: string }[]).map(ft => (
+                <label
+                  key={ft.key}
+                  className={`flex items-start p-4 border border-gray-200 rounded-xl transition-colors ${
+                    !canEditSettings ? 'bg-gray-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleFeatureToggle(ft.key, !formData.featureToggles[ft.key])}
+                    disabled={!canEditSettings}
+                    className="flex-shrink-0 mt-0.5"
+                  >
+                    {formData.featureToggles[ft.key] ? (
+                      <ToggleRight className="h-7 w-7 text-teal-600" />
+                    ) : (
+                      <ToggleLeft className="h-7 w-7 text-gray-400" />
+                    )}
+                  </button>
+                  <div className="ml-3 flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-semibold text-gray-900">{ft.label}</span>
+                      <span className={`inline-flex px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                        formData.featureToggles[ft.key]
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {formData.featureToggles[ft.key] ? 'ENABLED' : 'DISABLED'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">{ft.description}</p>
+                  </div>
+                </label>
+              ))}
             </div>
           </div>
 

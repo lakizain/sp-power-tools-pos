@@ -206,7 +206,7 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
           </div>
 
           <div className="text-center mt-6 pt-4 border-t border-gray-300">
-            <p className="text-xs text-gray-600">Thanks for choosing GOLDEN MART!</p>
+            <p className="text-xs text-gray-600">Thanks for choosing S&P POWER TOOLS!</p>
             <p className="text-xs text-gray-600 mt-1">
               {format(new Date(), 'yyyy-MM-dd HH:mm:ss')}
             </p>

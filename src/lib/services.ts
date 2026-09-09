@@ -14,7 +14,13 @@ import {
   AlertHistory,
   AlertSchedule,
   NotificationServiceConfig,
-  InventoryAlert
+  InventoryAlert,
+  Supplier,
+  Expense,
+  ProductReturn,
+  OutstandingPayment,
+  Rental,
+  RentalItem
 } from '../types'
 
 // Products Service
@@ -541,7 +547,7 @@ export const settingsService = {
     if (error) throw error
 
     return {
-      storeName: data.store_name || 'SIX PLUS 2025 POS',
+      storeName: data.store_name || 'S&P POWER TOOLS',
       storeAddress: data.store_address || '',
       storePhone: data.store_phone || '',
       storeEmail: data.store_email || '',
@@ -557,7 +563,8 @@ export const settingsService = {
       invoiceCounter: data.invoice_counter || 1000,
       exchangeRateProvider: data.exchange_rate_provider as any || 'exchangerate',
       exchangeRateApiKey: data.exchange_rate_api_key || undefined,
-      exchangeRateUpdateInterval: data.exchange_rate_update_interval || 60
+      exchangeRateUpdateInterval: data.exchange_rate_update_interval || 60,
+      featureToggles: (data.feature_toggles as any) || undefined
     }
   },
 
@@ -591,7 +598,8 @@ export const settingsService = {
         invoice_counter: settings.invoiceCounter,
         exchange_rate_provider: settings.exchangeRateProvider,
         exchange_rate_api_key: settings.exchangeRateApiKey,
-        exchange_rate_update_interval: settings.exchangeRateUpdateInterval
+        exchange_rate_update_interval: settings.exchangeRateUpdateInterval,
+        feature_toggles: settings.featureToggles
       })
       .eq('id', existingData.id)
       .select()
@@ -600,7 +608,7 @@ export const settingsService = {
     if (error) throw error
 
     return {
-      storeName: data.store_name || 'SIX PLUS 2025 POS',
+      storeName: data.store_name || 'S&P POWER TOOLS',
       storeAddress: data.store_address || '',
       storePhone: data.store_phone || '',
       storeEmail: data.store_email || '',
@@ -616,7 +624,8 @@ export const settingsService = {
       invoiceCounter: data.invoice_counter || 1000,
       exchangeRateProvider: data.exchange_rate_provider as any || 'exchangerate',
       exchangeRateApiKey: data.exchange_rate_api_key || undefined,
-      exchangeRateUpdateInterval: data.exchange_rate_update_interval || 60
+      exchangeRateUpdateInterval: data.exchange_rate_update_interval || 60,
+      featureToggles: (data.feature_toggles as any) || undefined
     }
   }
 }
@@ -1206,4 +1215,691 @@ export const notificationServiceConfigService = {
 
     if (error) throw error
   }
+}
+
+// ============================================================
+// Suppliers Service (EXPANDED ERP fields)
+// ============================================================
+export const suppliersService = {
+  async getAll(): Promise<Supplier[]> {
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select('*')
+      .order('name')
+
+    if (error) throw error
+
+    return data.map(s => ({
+      id: s.id,
+      name: s.name,
+      contactPerson: s.contact_person,
+      email: s.email || '',
+      phone: s.phone || '',
+      phone2: s.phone2,
+      address: s.address || '',
+      taxId: s.tax_id,
+      bankDetails: s.bank_details as any,
+      website: s.website,
+      paymentTerms: s.payment_terms,
+      rating: s.rating || 5,
+      totalPurchases: s.total_purchases || 0,
+      outstandingBalance: s.outstanding_balance || 0,
+      notes: s.notes,
+      active: s.active ?? true,
+      createdAt: new Date(s.created_at),
+      updatedAt: new Date(s.updated_at),
+    }))
+  },
+
+  async create(supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>): Promise<Supplier> {
+    const { data, error } = await supabase
+      .from('suppliers')
+      .insert({
+        name: supplier.name,
+        contact_person: supplier.contactPerson,
+        email: supplier.email,
+        phone: supplier.phone,
+        phone2: supplier.phone2,
+        address: supplier.address,
+        tax_id: supplier.taxId,
+        bank_details: supplier.bankDetails,
+        website: supplier.website,
+        payment_terms: supplier.paymentTerms,
+        rating: supplier.rating,
+        total_purchases: supplier.totalPurchases,
+        outstanding_balance: supplier.outstandingBalance,
+        notes: supplier.notes,
+        active: supplier.active,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.getById(data.id)
+  },
+
+  async update(id: string, s: Partial<Supplier>): Promise<Supplier> {
+    const { data, error } = await supabase
+      .from('suppliers')
+      .update({
+        name: s.name,
+        contact_person: s.contactPerson,
+        email: s.email,
+        phone: s.phone,
+        phone2: s.phone2,
+        address: s.address,
+        tax_id: s.taxId,
+        bank_details: s.bankDetails,
+        website: s.website,
+        payment_terms: s.paymentTerms,
+        rating: s.rating,
+        total_purchases: s.totalPurchases,
+        outstanding_balance: s.outstandingBalance,
+        notes: s.notes,
+        active: s.active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return this.getById(data.id)
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('suppliers').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  async getById(id: string): Promise<Supplier> {
+    const { data, error } = await supabase.from('suppliers').select('*').eq('id', id).single()
+    if (error) throw error
+    return {
+      id: data.id,
+      name: data.name,
+      contactPerson: data.contact_person,
+      email: data.email || '',
+      phone: data.phone || '',
+      phone2: data.phone2,
+      address: data.address || '',
+      taxId: data.tax_id,
+      bankDetails: data.bank_details as any,
+      website: data.website,
+      paymentTerms: data.payment_terms,
+      rating: data.rating || 5,
+      totalPurchases: data.total_purchases || 0,
+      outstandingBalance: data.outstanding_balance || 0,
+      notes: data.notes,
+      active: data.active ?? true,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+    }
+  },
+}
+
+// ============================================================
+// Expenses Service
+// ============================================================
+export const expensesService = {
+  async getAll(): Promise<Expense[]> {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .order('date', { ascending: false })
+
+    if (error) throw error
+
+    return data.map(e => ({
+      id: e.id,
+      category: e.category_name as any,
+      subcategory: e.subcategory,
+      description: e.description ?? '',
+      amount: e.amount || 0,
+      currency: e.currency,
+      date: new Date(e.date),
+      paymentMethod: e.payment_method as any,
+      supplierId: e.supplier_id,
+      referenceNumber: e.reference_number,
+      receiptNumber: e.receipt_number,
+      notes: e.notes,
+      attachmentUrl: e.attachment_url,
+      status: (e.status as any) || 'approved',
+      createdBy: e.created_by,
+      createdAt: new Date(e.created_at),
+      updatedAt: new Date(e.updated_at),
+    }))
+  },
+
+  async create(expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<Expense> {
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert({
+        category_name: expense.category,
+        subcategory: expense.subcategory,
+        description: expense.description,
+        amount: expense.amount,
+        currency: expense.currency,
+        date: expense.date instanceof Date ? expense.date.toISOString().split('T')[0] : expense.date,
+        payment_method: expense.paymentMethod,
+        supplier_id: expense.supplierId,
+        reference_number: expense.referenceNumber,
+        receipt_number: expense.receiptNumber,
+        notes: expense.notes,
+        attachment_url: expense.attachmentUrl,
+        status: expense.status,
+        created_by: expense.createdBy,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    const list = await this.getAll()
+    return list.find(r => r.id === data.id) as Expense
+  },
+
+  async update(id: string, expense: Partial<Expense>): Promise<Expense> {
+    const { data, error } = await supabase
+      .from('expenses')
+      .update({
+        category_name: expense.category,
+        subcategory: expense.subcategory,
+        description: expense.description,
+        amount: expense.amount,
+        currency: expense.currency,
+        date: expense.date instanceof Date ? expense.date.toISOString().split('T')[0] : expense.date,
+        payment_method: expense.paymentMethod,
+        supplier_id: expense.supplierId,
+        reference_number: expense.referenceNumber,
+        receipt_number: expense.receiptNumber,
+        notes: expense.notes,
+        attachment_url: expense.attachmentUrl,
+        status: expense.status,
+        created_by: expense.createdBy,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    const list = await this.getAll()
+    return list.find(r => r.id === id) as Expense
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('expenses').delete().eq('id', id)
+    if (error) throw error
+  },
+}
+
+// ============================================================
+// Inventory Helpers
+// ============================================================
+async function restockInventory(items: ReturnItem[] | RentalItem[]): Promise<void> {
+  for (const item of items) {
+    const productId = (item as any).productId || (item as any).product_id
+    const qty = Number(item.quantity || 0)
+    if (!productId || productId.startsWith('custom-') || qty <= 0) continue
+    try {
+      const { error } = await supabase.rpc('increment_product_stock', {
+        p_id: productId,
+        p_amount: qty
+      }) as any
+      // If RPC doesn't exist (not defined yet), fall back to direct update
+      if (error) {
+        const { data: curr } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', productId)
+          .limit(1)
+          .maybeSingle()
+        if (curr) {
+          const newStock = Number(curr.stock || 0) + qty
+          await supabase.from('products').update({ stock: newStock }).eq('id', productId)
+        }
+      }
+    } catch (err) {
+      console.warn(`Restock skipped for product ${productId}:`, err)
+    }
+  }
+}
+
+// ============================================================
+// Product Returns Service
+// ============================================================
+export const returnsService = {
+  async getAll(): Promise<ProductReturn[]> {
+    const { data, error } = await supabase
+      .from('product_returns')
+      .select(`*, return_items (*)`)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return data.map(r => ({
+      id: r.id,
+      returnNumber: r.return_number,
+      saleId: r.sale_id,
+      invoiceNumber: r.invoice_number,
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      items: (r.return_items || []).map((ri: any) => ({
+        id: ri.id,
+        productId: ri.product_id,
+        productName: ri.product_name,
+        sku: ri.sku,
+        quantity: ri.quantity,
+        condition: ri.condition,
+        unitPrice: ri.unit_price,
+        subtotal: ri.subtotal,
+        taxRate: ri.tax_rate,
+        taxAmount: ri.tax_amount,
+        notes: ri.notes,
+      })),
+      status: r.status as any,
+      returnMethod: r.return_method as any,
+      paymentMethod: r.payment_method,
+      reason: r.reason,
+      notes: r.notes,
+      subtotal: r.subtotal,
+      taxAmount: r.tax_amount,
+      totalRefund: r.total_refund,
+      itemsCount: r.items_count,
+      restocked: r.restocked,
+      processedBy: r.processed_by,
+      processedAt: r.processed_at ? new Date(r.processed_at) : undefined,
+      createdBy: r.created_by,
+      timestamp: new Date(r.created_at),
+      createdAt: new Date(r.created_at),
+      updatedAt: new Date(r.updated_at),
+    }))
+  },
+
+  async create(ret: Omit<ProductReturn, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProductReturn> {
+    const isRentalReturn = ret.returnMethod === 'rental_return'
+    const normalized = {
+      ...ret,
+      subtotal: isRentalReturn ? 0 : ret.subtotal,
+      taxAmount: isRentalReturn ? 0 : ret.taxAmount,
+      totalRefund: isRentalReturn ? 0 : ret.totalRefund,
+      restocked: isRentalReturn ? true : !!ret.restocked,
+    }
+
+    const { data: header, error: hErr } = await supabase
+      .from('product_returns')
+      .insert({
+        return_number: normalized.returnNumber,
+        sale_id: normalized.saleId,
+        invoice_number: normalized.invoiceNumber,
+        customer_id: normalized.customerId,
+        customer_name: normalized.customerName,
+        status: normalized.status,
+        return_method: normalized.returnMethod,
+        payment_method: normalized.paymentMethod,
+        reason: normalized.reason,
+        notes: normalized.notes,
+        subtotal: normalized.subtotal,
+        tax_amount: normalized.taxAmount,
+        total_refund: normalized.totalRefund,
+        items_count: normalized.itemsCount,
+        restocked: normalized.restocked,
+        processed_by: normalized.processedBy,
+        processed_at: normalized.processedAt?.toISOString(),
+        created_by: normalized.createdBy,
+      })
+      .select()
+      .single()
+    if (hErr) throw hErr
+
+    if (normalized.items && normalized.items.length > 0) {
+      const rows = normalized.items.map(i => ({
+        return_id: header.id,
+        product_id: i.productId,
+        product_name: i.productName,
+        sku: i.sku,
+        quantity: i.quantity,
+        condition: i.condition,
+        unit_price: i.unitPrice,
+        subtotal: i.subtotal,
+        tax_rate: i.taxRate,
+        tax_amount: i.taxAmount,
+        notes: i.notes,
+      }))
+      const { error: riErr } = await supabase.from('return_items').insert(rows)
+      if (riErr) throw riErr
+    }
+
+    if (normalized.restocked && normalized.items) {
+      await restockInventory(normalized.items)
+    }
+
+    const list = await this.getAll()
+    return list.find(r => r.id === header.id) as ProductReturn
+  },
+
+  async update(id: string, ret: Partial<ProductReturn>): Promise<ProductReturn> {
+    const isRentalReturn = ret.returnMethod === 'rental_return'
+    const normalized: Partial<ProductReturn> = {
+      ...ret,
+    }
+    if (isRentalReturn) {
+      normalized.subtotal = 0
+      normalized.taxAmount = 0
+      normalized.totalRefund = 0
+      normalized.restocked = true
+    }
+
+    const { data: header, error: hErr } = await supabase
+      .from('product_returns')
+      .update({
+        status: normalized.status,
+        return_method: normalized.returnMethod,
+        payment_method: normalized.paymentMethod,
+        reason: normalized.reason,
+        notes: normalized.notes,
+        subtotal: normalized.subtotal,
+        tax_amount: normalized.taxAmount,
+        total_refund: normalized.totalRefund,
+        items_count: normalized.itemsCount,
+        restocked: normalized.restocked,
+        processed_by: normalized.processedBy,
+        processed_at: normalized.processedAt?.toISOString(),
+        created_by: normalized.createdBy,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (hErr) throw hErr
+
+    if (normalized.items) {
+      await supabase.from('return_items').delete().eq('return_id', id)
+      if (normalized.items.length > 0) {
+        const rows = normalized.items.map(i => ({
+          return_id: id,
+          product_id: i.productId,
+          product_name: i.productName,
+          sku: i.sku,
+          quantity: i.quantity,
+          condition: i.condition,
+          unit_price: i.unitPrice,
+          subtotal: i.subtotal,
+          tax_rate: i.taxRate,
+          tax_amount: i.taxAmount,
+          notes: i.notes,
+        }))
+        const { error: riErr } = await supabase.from('return_items').insert(rows)
+        if (riErr) throw riErr
+      }
+    }
+
+    if (normalized.restocked && normalized.items) {
+      await restockInventory(normalized.items)
+    }
+
+    const list = await this.getAll()
+    return list.find(r => r.id === id) as ProductReturn
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('product_returns').delete().eq('id', id)
+    if (error) throw error
+  },
+}
+
+// ============================================================
+// Outstanding Payments Service
+// ============================================================
+export const outstandingPaymentsService = {
+  async getAll(): Promise<OutstandingPayment[]> {
+    const { data, error } = await supabase
+      .from('outstanding_payments')
+      .select(`*, payment_records (*)`)
+      .order('due_date', { ascending: true })
+
+    if (error) throw error
+
+    return data.map(op => ({
+      id: op.id,
+      customerId: op.customer_id,
+      customerName: op.customer_name,
+      saleId: op.sale_id,
+      invoiceNumber: op.invoice_number,
+      totalAmount: op.total_amount,
+      paidAmount: op.paid_amount,
+      outstandingAmount: op.outstanding_amount,
+      dueDate: new Date(op.due_date),
+      issueDate: new Date(op.issue_date),
+      status: op.status as any,
+      paymentHistory: (op.payment_records || []).map((pr: any) => ({
+        id: pr.id,
+        amount: pr.amount,
+        date: new Date(pr.payment_date),
+        method: pr.method,
+        receivedBy: pr.received_by,
+        reference: pr.reference_number,
+        notes: pr.notes,
+      })),
+      notes: op.notes,
+      createdAt: new Date(op.created_at),
+      updatedAt: new Date(op.updated_at),
+    }))
+  },
+
+  async create(op: Omit<OutstandingPayment, 'id' | 'createdAt' | 'updatedAt'>): Promise<OutstandingPayment> {
+    const { data, error } = await supabase
+      .from('outstanding_payments')
+      .insert({
+        customer_id: op.customerId,
+        customer_name: op.customerName,
+        sale_id: op.saleId,
+        invoice_number: op.invoiceNumber,
+        total_amount: op.totalAmount,
+        paid_amount: op.paidAmount,
+        issue_date: op.issueDate instanceof Date ? op.issueDate.toISOString().split('T')[0] : op.issueDate,
+        due_date: op.dueDate instanceof Date ? op.dueDate.toISOString().split('T')[0] : op.dueDate,
+        status: op.status,
+        notes: op.notes,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    const list = await this.getAll()
+    return list.find(r => r.id === data.id) as OutstandingPayment
+  },
+
+  async addPayment(outstandingPaymentId: string, record: any): Promise<OutstandingPayment> {
+    const opResp = await supabase.from('outstanding_payments').select('paid_amount, total_amount').eq('id', outstandingPaymentId).single()
+    if (opResp.error) throw opResp.error
+    const currentPaid = opResp.data.paid_amount
+    const newPaid = currentPaid + (record.amount || 0)
+
+    const { error: prErr } = await supabase.from('payment_records').insert({
+      outstanding_payment_id: outstandingPaymentId,
+      customer_id: record.customerId,
+      amount: record.amount,
+      currency: record.currency,
+      payment_date: record.date instanceof Date ? record.date.toISOString() : record.date,
+      method: record.method,
+      reference_number: record.reference,
+      notes: record.notes,
+      received_by: record.receivedBy,
+    })
+    if (prErr) throw prErr
+
+    const { data: updated, error: uErr } = await supabase
+      .from('outstanding_payments')
+      .update({ paid_amount: newPaid, updated_at: new Date().toISOString() })
+      .eq('id', outstandingPaymentId)
+      .select()
+      .single()
+    if (uErr) throw uErr
+    const list = await this.getAll()
+    return list.find(r => r.id === updated.id) as OutstandingPayment
+  },
+
+  async update(id: string, op: Partial<OutstandingPayment>): Promise<OutstandingPayment> {
+    const { data, error } = await supabase
+      .from('outstanding_payments')
+      .update({
+        customer_id: op.customerId,
+        customer_name: op.customerName,
+        sale_id: op.saleId,
+        invoice_number: op.invoiceNumber,
+        total_amount: op.totalAmount,
+        paid_amount: op.paidAmount,
+        issue_date: op.issueDate instanceof Date ? op.issueDate.toISOString().split('T')[0] : op.issueDate,
+        due_date: op.dueDate instanceof Date ? op.dueDate.toISOString().split('T')[0] : op.dueDate,
+        status: op.status,
+        notes: op.notes,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    const list = await this.getAll()
+    return list.find(r => r.id === data.id) as OutstandingPayment
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('outstanding_payments').delete().eq('id', id)
+    if (error) throw error
+  },
+}
+
+// ============================================================
+// Rentals Service
+// ============================================================
+export const rentalsService = {
+  async getAll(): Promise<Rental[]> {
+    const { data, error } = await supabase
+      .from('rentals')
+      .select(`*, rental_items (*)`)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return (data || []).map(r => ({
+      id: r.id,
+      rentalNumber: r.rental_number,
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      items: (r.rental_items || []).map((ri: any) => ({
+        id: ri.id,
+        productId: ri.product_id,
+        productName: ri.product_name,
+        sku: ri.sku,
+        quantity: ri.quantity,
+        dailyRate: ri.daily_rate,
+        subtotal: ri.subtotal,
+        condition: ri.condition as any,
+        notes: ri.notes,
+      })),
+      rentFrom: new Date(r.rent_from),
+      rentTo: new Date(r.rent_to),
+      dailyRate: r.daily_rate,
+      weeklyRate: r.weekly_rate ?? undefined,
+      securityDeposit: r.security_deposit,
+      totalRent: r.total_rent,
+      paidAmount: r.paid_amount,
+      status: r.status as any,
+      notes: r.notes,
+      createdBy: r.created_by,
+      createdAt: new Date(r.created_at),
+      updatedAt: new Date(r.updated_at),
+    }))
+  },
+
+  async create(r: Omit<Rental, 'id' | 'createdAt' | 'updatedAt'>): Promise<Rental> {
+    const { data: header, error: hErr } = await supabase
+      .from('rentals')
+      .insert({
+        rental_number: r.rentalNumber,
+        customer_id: r.customerId,
+        customer_name: r.customerName,
+        rent_from: r.rentFrom instanceof Date ? r.rentFrom.toISOString().split('T')[0] : r.rentFrom,
+        rent_to: r.rentTo instanceof Date ? r.rentTo.toISOString().split('T')[0] : r.rentTo,
+        daily_rate: r.dailyRate,
+        weekly_rate: r.weeklyRate,
+        security_deposit: r.securityDeposit,
+        total_rent: r.totalRent,
+        paid_amount: r.paidAmount,
+        status: r.status,
+        notes: r.notes,
+        created_by: r.createdBy,
+      })
+      .select()
+      .single()
+    if (hErr) throw hErr
+
+    if (r.items && r.items.length > 0) {
+      const rows = r.items.map(i => ({
+        rental_id: header.id,
+        product_id: i.productId,
+        product_name: i.productName,
+        sku: i.sku,
+        quantity: i.quantity,
+        daily_rate: i.dailyRate,
+        subtotal: i.subtotal,
+        condition: i.condition,
+        notes: i.notes,
+      }))
+      const { error: riErr } = await supabase.from('rental_items').insert(rows)
+      if (riErr) throw riErr
+    }
+
+    const list = await this.getAll()
+    return list.find(x => x.id === header.id) as Rental
+  },
+
+  async update(id: string, r: Partial<Rental>): Promise<Rental> {
+    const { data: header, error: hErr } = await supabase
+      .from('rentals')
+      .update({
+        rental_number: r.rentalNumber,
+        customer_id: r.customerId,
+        customer_name: r.customerName,
+        rent_from: r.rentFrom instanceof Date ? r.rentFrom.toISOString().split('T')[0] : r.rentFrom,
+        rent_to: r.rentTo instanceof Date ? r.rentTo.toISOString().split('T')[0] : r.rentTo,
+        daily_rate: r.dailyRate,
+        weekly_rate: r.weeklyRate,
+        security_deposit: r.securityDeposit,
+        total_rent: r.totalRent,
+        paid_amount: r.paidAmount,
+        status: r.status,
+        notes: r.notes,
+        created_by: r.createdBy,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (hErr) throw hErr
+
+    if (r.items) {
+      await supabase.from('rental_items').delete().eq('rental_id', id)
+      if (r.items.length > 0) {
+        const rows = r.items.map(i => ({
+          rental_id: id,
+          product_id: i.productId,
+          product_name: i.productName,
+          sku: i.sku,
+          quantity: i.quantity,
+          daily_rate: i.dailyRate,
+          subtotal: i.subtotal,
+          condition: i.condition,
+          notes: i.notes,
+        }))
+        const { error: riErr } = await supabase.from('rental_items').insert(rows)
+        if (riErr) throw riErr
+      }
+    }
+
+    const list = await this.getAll()
+    return list.find(x => x.id === id) as Rental
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('rentals').delete().eq('id', id)
+    if (error) throw error
+  },
 }

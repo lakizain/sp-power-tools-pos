@@ -14,7 +14,7 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-    const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('system');
+    const [theme, setThemeState] = useState<'light' | 'dark' | 'system'>('light');
     const [isDark, setIsDark] = useState(false);
 
     useEffect(() => {

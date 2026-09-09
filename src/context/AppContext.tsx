@@ -3,7 +3,17 @@
 // All components should now use SupabaseAppContext.tsx instead
 
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { Product, Customer, Sale, User, AppSettings, CartItem, Discount, SalesTab } from '../types';
+import { Product, Customer, Sale, User, AppSettings, CartItem, Discount, SalesTab, FeatureToggles } from '../types';
+
+const defaultFeatureToggles: FeatureToggles = {
+  transactionDelete: true,
+  productReturns: true,
+  outstandingPayments: true,
+  productDiscount: true,
+  expenseTracking: true,
+  supplierManagement: true,
+  alertMonitoring: true,
+};
 
 interface AppState {
   products: Product[];
@@ -59,7 +69,7 @@ const initialState: AppState = {
   currentUser: null,
   selectedCustomer: null,
   settings: {
-    storeName: 'SIX PLUS 2025 POS',
+    storeName: 'S&P POWER TOOLS',
     storeAddress: '123 Business Street, Colombo 03, Sri Lanka',
     storePhone: '+94 11 234 5678',
     storeEmail: 'info@sekalabs.lk',
@@ -71,6 +81,7 @@ const initialState: AppState = {
     theme: 'light',
     invoicePrefix: 'INV',
     invoiceCounter: 1000,
+    featureToggles: defaultFeatureToggles,
   },
   salesTabs: [],
   activeSalesTab: '',

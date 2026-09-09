@@ -3,7 +3,7 @@ import { ProductGrid } from './ProductGrid';
 import { Cart } from './Cart';
 import { CheckoutModal } from './CheckoutModal';
 import { SalesTabManager } from './SalesTabManager';
-import { Product, Sale } from '../../types';
+import { Product, Sale, CartItem } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { salesService } from '../../lib/services';
@@ -69,6 +69,8 @@ export function POSTerminal() {
       item.product.id === product.id
     );
 
+    let newCart: CartItem[] = [...state.cart];
+
     if (existingItemIndex >= 0) {
       const existingItem = state.cart[existingItemIndex];
       const newQuantity = existingItem.quantity + 1;
@@ -79,7 +81,10 @@ export function POSTerminal() {
           quantity: newQuantity,
           subtotal: product.price * newQuantity - (existingItem.discount || 0)
         };
+        newCart[existingItemIndex] = updatedItem;
         dispatch({ type: 'UPDATE_CART_ITEM', payload: { index: existingItemIndex, item: updatedItem } });
+      } else {
+        return;
       }
     } else {
       const newItem = {
@@ -89,18 +94,16 @@ export function POSTerminal() {
         discountType: 'percentage' as const,
         subtotal: product.price
       };
+      newCart = [...state.cart, newItem];
       dispatch({ type: 'ADD_TO_CART', payload: newItem });
     }
 
     if (state.activeSalesTab) {
-      const updatedCart = state.cart.map((item, idx) =>
-        idx === existingItemIndex ? { ...item, quantity: item.quantity + 1, subtotal: product.price * (item.quantity + 1) - (item.discount || 0) } : item
-      );
       dispatch({
         type: 'UPDATE_SALES_TAB',
         payload: {
           id: state.activeSalesTab,
-          updates: { cart: existingItemIndex >= 0 ? updatedCart : [...state.cart, newItem] }
+          updates: { cart: newCart }
         }
       });
     }
@@ -115,6 +118,8 @@ export function POSTerminal() {
       (product.isWeightBased ? false : true) // For weight-based products, always add new item
     );
 
+    let newCart: CartItem[] = [...state.cart];
+
     if (existingItemIndex >= 0 && !product.isWeightBased) {
       const existingItem = state.cart[existingItemIndex];
       const newQuantity = existingItem.quantity + 1;
@@ -126,11 +131,14 @@ export function POSTerminal() {
           quantity: newQuantity,
           subtotal: product.price * newQuantity - (existingItem.discount || 0)
         };
+        newCart[existingItemIndex] = updatedItem;
         dispatch({ type: 'UPDATE_CART_ITEM', payload: { index: existingItemIndex, item: updatedItem } });
+      } else {
+        return;
       }
     } else {
       // For weight-based products or new items
-      const quantity = product.isWeightBased ? 1 : 1;
+      const quantity = 1;
       const itemWeight = weight || undefined;
       const price = product.isWeightBased ? (product.pricePerUnit || 0) * (weight || 1) : product.price;
 
@@ -142,6 +150,7 @@ export function POSTerminal() {
         discountType: 'percentage' as const,
         subtotal: price
       };
+      newCart = [...state.cart, newItem];
       dispatch({ type: 'ADD_TO_CART', payload: newItem });
     }
 
@@ -151,7 +160,7 @@ export function POSTerminal() {
         type: 'UPDATE_SALES_TAB',
         payload: {
           id: state.activeSalesTab,
-          updates: { cart: state.cart }
+          updates: { cart: newCart }
         }
       });
     }

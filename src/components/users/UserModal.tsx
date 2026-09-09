@@ -3,7 +3,7 @@ import { X, User, Mail, Lock, Shield, Crown } from 'lucide-react';
 import { User as UserType } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { usersService } from '../../lib/services';
-import { supabaseAdmin } from '../../lib/supabase';
+import { supabaseAdmin, getSupabaseAdmin } from '../../lib/supabase';
 import { swalConfig } from '../../lib/sweetAlert';
 
 interface UserModalProps {
@@ -78,12 +78,12 @@ export function UserModal({ isOpen, onClose, user }: UserModalProps) {
           return;
         }
 
-        if (!supabaseAdmin) {
+        if (!getSupabaseAdmin()) {
           swalConfig.error('Service Role Key not configured. Please set VITE_SUPABASE_SERVICE_ROLE_KEY in .env.local to create new users.');
           return;
         }
 
-        const admin = supabaseAdmin;
+        const admin = getSupabaseAdmin()!;
 
         // First create the auth user
         const { data: authData, error: authError } = await admin.auth.admin.createUser({

@@ -31,7 +31,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- App Settings Table (single row configuration)
 CREATE TABLE IF NOT EXISTS app_settings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    store_name TEXT DEFAULT 'SIX PLUS 2025 POS',
+    store_name TEXT DEFAULT 'S&P POWER TOOLS',
     store_address TEXT,
     store_phone TEXT,
     store_email TEXT,
@@ -304,24 +304,34 @@ END;
 $$ language 'plpgsql';
 
 -- Apply update triggers to all tables
+DROP TRIGGER IF EXISTS update_app_settings_updated_at ON app_settings;
 CREATE TRIGGER update_app_settings_updated_at BEFORE UPDATE ON app_settings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_customers_updated_at ON customers;
 CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_suppliers_updated_at ON suppliers;
 CREATE TRIGGER update_suppliers_updated_at BEFORE UPDATE ON suppliers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_product_batches_updated_at ON product_batches;
 CREATE TRIGGER update_product_batches_updated_at BEFORE UPDATE ON product_batches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_discounts_updated_at ON discounts;
 CREATE TRIGGER update_discounts_updated_at BEFORE UPDATE ON discounts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_sales_updated_at ON sales;
 CREATE TRIGGER update_sales_updated_at BEFORE UPDATE ON sales FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_sales_tabs_updated_at ON sales_tabs;
 CREATE TRIGGER update_sales_tabs_updated_at BEFORE UPDATE ON sales_tabs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to generate unique invoice numbers
@@ -372,6 +382,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to update customer stats on completed sales
+DROP TRIGGER IF EXISTS trigger_update_customer_stats ON sales;
 CREATE TRIGGER trigger_update_customer_stats
     AFTER INSERT OR UPDATE ON sales
     FOR EACH ROW
@@ -389,6 +400,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to auto-generate invoice numbers
+DROP TRIGGER IF EXISTS trigger_auto_generate_invoice_number ON sales;
 CREATE TRIGGER trigger_auto_generate_invoice_number
     BEFORE INSERT ON sales
     FOR EACH ROW
@@ -420,84 +432,101 @@ ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_tabs ENABLE ROW LEVEL SECURITY;
 
 -- App Settings policies (readable by all authenticated users, writable by authenticated users)
+DROP POLICY IF EXISTS "App settings are viewable by authenticated users" ON app_settings;
 CREATE POLICY "App settings are viewable by authenticated users" ON app_settings FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "App settings are editable by authenticated users" ON app_settings;
 CREATE POLICY "App settings are editable by authenticated users" ON app_settings FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Categories policies (full access for authenticated users)
+DROP POLICY IF EXISTS "Categories are viewable by authenticated users" ON categories;
 CREATE POLICY "Categories are viewable by authenticated users" ON categories FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Categories are editable by authenticated users" ON categories;
 CREATE POLICY "Categories are editable by authenticated users" ON categories FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Customers policies (full access for authenticated users)
+DROP POLICY IF EXISTS "Customers are viewable by authenticated users" ON customers;
 CREATE POLICY "Customers are viewable by authenticated users" ON customers FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Customers are editable by authenticated users" ON customers;
 CREATE POLICY "Customers are editable by authenticated users" ON customers FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Suppliers policies (full access for authenticated users)
+DROP POLICY IF EXISTS "Suppliers are viewable by authenticated users" ON suppliers;
 CREATE POLICY "Suppliers are viewable by authenticated users" ON suppliers FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Suppliers are editable by authenticated users" ON suppliers;
 CREATE POLICY "Suppliers are editable by authenticated users" ON suppliers FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Products policies (full access for authenticated users)
+DROP POLICY IF EXISTS "Products are viewable by authenticated users" ON products;
 CREATE POLICY "Products are viewable by authenticated users" ON products FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Products are editable by authenticated users" ON products;
 CREATE POLICY "Products are editable by authenticated users" ON products FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Product Batches policies (full access for authenticated users)
+DROP POLICY IF EXISTS "Product batches are viewable by authenticated users" ON product_batches;
 CREATE POLICY "Product batches are viewable by authenticated users" ON product_batches FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Product batches are editable by authenticated users" ON product_batches;
 CREATE POLICY "Product batches are editable by authenticated users" ON product_batches FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Discounts policies (full access for authenticated users)
+DROP POLICY IF EXISTS "Discounts are viewable by authenticated users" ON discounts;
 CREATE POLICY "Discounts are viewable by authenticated users" ON discounts FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Discounts are editable by authenticated users" ON discounts;
 CREATE POLICY "Discounts are editable by authenticated users" ON discounts FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Users policies (publicly viewable, write enabled, only self and admin updates)
+DROP POLICY IF EXISTS "Users are publicly viewable" ON users;
 CREATE POLICY "Users are publicly viewable" ON users FOR
 SELECT USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can insert their own profile" ON users;
 CREATE POLICY "Authenticated users can insert their own profile" ON users FOR
 INSERT
 WITH
     CHECK (true);
 
+DROP POLICY IF EXISTS "Users can update their own profile or admins can update any" ON users;
 CREATE POLICY "Users can update their own profile or admins can update any" ON users FOR
 UPDATE USING (
     auth.role () = 'authenticated'
@@ -514,22 +543,26 @@ UPDATE USING (
 );
 
 -- Sales policies (full access for authenticated users)
+DROP POLICY IF EXISTS "Sales are viewable by authenticated users" ON sales;
 CREATE POLICY "Sales are viewable by authenticated users" ON sales FOR
 SELECT USING (
         auth.role () = 'authenticated'
     );
 
+DROP POLICY IF EXISTS "Sales are editable by authenticated users" ON sales;
 CREATE POLICY "Sales are editable by authenticated users" ON sales FOR ALL USING (
     auth.role () = 'authenticated'
 );
 
 -- Sales Tabs policies (users can only access their own tabs)
+DROP POLICY IF EXISTS "Users can view their own sales tabs" ON sales_tabs;
 CREATE POLICY "Users can view their own sales tabs" ON sales_tabs FOR
 SELECT USING (
         auth.role () = 'authenticated'
         AND user_id = auth.uid ()
     );
 
+DROP POLICY IF EXISTS "Users can manage their own sales tabs" ON sales_tabs;
 CREATE POLICY "Users can manage their own sales tabs" ON sales_tabs FOR ALL USING (
     auth.role () = 'authenticated'
     AND user_id = auth.uid ()
@@ -551,7 +584,7 @@ INSERT INTO
         invoice_counter
     )
 VALUES (
-        'SIX PLUS 2025 POS Store',
+        'S&P POWER TOOLS Store',
         'USD',
         0.0875, -- 8.75% tax rate
         'touch',
@@ -667,7 +700,7 @@ CREATE INDEX IF NOT EXISTS idx_customers_name_text ON customers (name text_patte
 -- ================================================================
 
 -- Summary of created objects
-DO $$ BEGIN RAISE NOTICE '=== SIX PLUS 2025 POS DATABASE SETUP COMPLETE ===';
+DO $$ BEGIN RAISE NOTICE '=== S&P POWER TOOLS POS DATABASE SETUP COMPLETE ===';
 
 RAISE NOTICE 'Tables created: app_settings, categories, customers, suppliers, products, product_batches, discounts, users, sales, sales_tabs';
 

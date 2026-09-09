@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
   User, Settings, LogOut, ShoppingCart, Monitor, Smartphone, Bell, Menu, X, Percent,
-  Receipt, Package, Users, BarChart3, Sun, Moon
+  Receipt, Package, Users, BarChart3, Sun, Moon, Truck, Wallet, CreditCard, RotateCcw,
+  AlertTriangle, KeyRound
 } from 'lucide-react';
-import { useApp } from '../../context/SupabaseAppContext';
+import { useApp, useFeatureToggles } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { swalConfig } from '../../lib/sweetAlert';
@@ -15,6 +16,7 @@ interface HeaderProps {
 
 export function Header({ currentView, onViewChange }: HeaderProps) {
   const { state, dispatch } = useApp();
+  const features = useFeatureToggles();
   const { signOut } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -43,36 +45,67 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
 
   const cartItemCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Role-based navigation with proper permissions
+  // Role-based navigation with proper permissions + optional feature toggles
   const getNavigationItems = () => {
     const role = state.currentUser?.role;
+    const isAdminOrManager = role === 'admin' || role === 'manager';
     const items = [];
 
     // POS - All roles can access
     items.push({ id: 'pos', label: 'POS', icon: ShoppingCart, color: 'text-blue-600' });
 
     // Sales/Transactions - Manager and Admin only (Cashiers should only have POS access)
-    if (role === 'admin' || role === 'manager') {
+    if (isAdminOrManager) {
       items.push({ id: 'transactions', label: 'Sales', icon: Receipt, color: 'text-green-600' });
     }
 
     // Inventory - Manager and Admin can access
-    if (role === 'admin' || role === 'manager') {
+    if (isAdminOrManager) {
       items.push({ id: 'inventory', label: 'Inventory', icon: Package, color: 'text-purple-600' });
     }
 
     // Customers - Manager and Admin can access
-    if (role === 'admin' || role === 'manager') {
+    if (isAdminOrManager) {
       items.push({ id: 'customers', label: 'Customers', icon: Users, color: 'text-orange-600' });
     }
 
-    // Discounts - Manager and Admin can access
-    if (role === 'admin' || role === 'manager') {
+    // Outstanding Payments - Optional feature
+    if (isAdminOrManager && features.outstandingPayments) {
+      items.push({ id: 'payments', label: 'Payments', icon: CreditCard, color: 'text-cyan-600' });
+    }
+
+    // Product Returns - Optional feature
+    if (isAdminOrManager && features.productReturns) {
+      items.push({ id: 'returns', label: 'Returns', icon: RotateCcw, color: 'text-amber-600' });
+    }
+
+    // Product Rentals - Optional feature
+    if (isAdminOrManager && features.productRentals) {
+      items.push({ id: 'rentals', label: 'Rentals', icon: KeyRound, color: 'text-violet-600' });
+    }
+
+    // Expense Tracking - Optional feature
+    if (isAdminOrManager && features.expenseTracking) {
+      items.push({ id: 'expenses', label: 'Expenses', icon: Wallet, color: 'text-rose-600' });
+    }
+
+    // Supplier Management - Optional feature
+    if (isAdminOrManager && features.supplierManagement) {
+      items.push({ id: 'suppliers', label: 'Suppliers', icon: Truck, color: 'text-teal-600' });
+    }
+
+    // Discounts - Optional feature now
+    if (isAdminOrManager && features.productDiscount) {
       items.push({ id: 'discounts', label: 'Discounts', icon: Percent, color: 'text-pink-600' });
     }
 
+    // Alert Monitoring - Optional feature
+    if (isAdminOrManager && features.alertMonitoring) {
+      items.push({ id: 'alerts', label: 'Alerts', icon: AlertTriangle, color: 'text-red-600' });
+    }
+
     // Reports - Manager and Admin can access
-    if (role === 'admin' || role === 'manager') {
+    if (isAdminOrManager) {
       items.push({ id: 'reports', label: 'Reports', icon: BarChart3, color: 'text-red-600' });
     }
 
@@ -112,13 +145,13 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
               </div>
             </div>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden xl:flex space-x-1 ml-8">
+            {/* Desktop Navigation - Scrollable to prevent overflow */}
+            <nav className="hidden lg:flex items-center space-x-1 ml-6 overflow-x-auto scrollbar-hide max-w-[60vw] pb-1">
               {navigationItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => onViewChange(item.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-semibold transition-all duration-300 ${currentView === item.id
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-semibold transition-all duration-300 flex-shrink-0 ${currentView === item.id
                     ? 'bg-primary-50 text-primary-700 shadow-soft dark:bg-primary-900/30 dark:text-primary-300'
                     : 'text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
                     }`}
@@ -172,8 +205,16 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
               </div>
             )}
 
-            {/* Notifications */}
-            <button className="p-2 rounded-2xl text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100/50 transition-all duration-300 relative">
+            {/* Notifications - Navigate to Alerts */}
+            <button
+              onClick={() => features.alertMonitoring && onViewChange('alerts')}
+              className={`p-2 rounded-2xl transition-all duration-300 relative ${
+                currentView === 'alerts'
+                  ? 'bg-primary-50 text-primary-700 shadow-soft dark:bg-primary-900/30 dark:text-primary-300'
+                  : 'text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
+              }`}
+              title="Alerts & Notifications"
+            >
               <Bell className="h-5 w-5" />
               <span className="absolute -top-1 -right-1 h-3 w-3 bg-danger-500 rounded-full animate-pulse"></span>
             </button>
@@ -215,7 +256,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="xl:hidden p-2 rounded-2xl text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100/50 transition-all duration-300"
+              className="lg:hidden p-2 rounded-2xl text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50 transition-all duration-300"
             >
               {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -224,7 +265,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
 
         {/* Mobile Navigation Menu */}
         {showMobileMenu && (
-          <div className="xl:hidden border-t border-secondary-200/50 py-4 animate-slide-down">
+          <div className="lg:hidden border-t border-secondary-200/50 dark:border-secondary-700/50 py-4 animate-slide-down">
             <nav className="space-y-2">
               {navigationItems.map((item) => (
                 <button
@@ -234,30 +275,30 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
                     setShowMobileMenu(false);
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-300 ${currentView === item.id
-                    ? 'bg-primary-50 text-primary-700 shadow-soft'
-                    : 'text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100/50'
+                    ? 'bg-primary-50 text-primary-700 shadow-soft dark:bg-primary-900/30 dark:text-primary-300'
+                    : 'text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
                     }`}
                 >
-                  <item.icon className={`h-5 w-5 ${currentView === item.id ? 'text-primary-600' : item.color}`} />
+                  <item.icon className={`h-5 w-5 ${currentView === item.id ? 'text-primary-600 dark:text-primary-400' : item.color}`} />
                   <span>{item.label}</span>
                 </button>
               ))}
 
-              <div className="border-t border-secondary-200/50 pt-4 mt-4 space-y-2">
+              <div className="border-t border-secondary-200/50 dark:border-secondary-700/50 pt-4 mt-4 space-y-2">
                 <button
                   onClick={() => {
                     onViewChange('settings');
                     setShowMobileMenu(false);
                   }}
-                  className="w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100/50 transition-all duration-300"
+                  className="w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50 transition-all duration-300"
                 >
-                  <Settings className="h-5 w-5 text-secondary-500" />
+                  <Settings className="h-5 w-5 text-secondary-500 dark:text-secondary-400" />
                   <span>Settings</span>
                 </button>
 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold text-danger-600 hover:bg-danger-50 transition-all duration-300"
+                  className="w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold text-danger-600 hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-900/30 transition-all duration-300"
                 >
                   <LogOut className="h-5 w-5" />
                   <span>Logout</span>

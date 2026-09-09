@@ -50,7 +50,7 @@ export function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4 shadow-lg">
             <ShoppingCart className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">SIX PLUS 2025 POS</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">S&P POWER TOOLS POS</h1>
           <p className="text-gray-600">
             {isSignUp ? 'Create your account' : 'Welcome back! Please sign in'}
           </p>

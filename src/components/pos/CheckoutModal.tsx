@@ -4,7 +4,7 @@ import { Sale, CardDetails, AppliedDiscount, CartItem, Payment } from '../../typ
 import { useApp, checkDiscountEligibility, useInvoiceGeneration } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
 import { ReceiptPrint } from './ReceiptPrint';
-import { salesService, customersService, productsService } from '../../lib/services';
+import { salesService, customersService, productsService, outstandingPaymentsService } from '../../lib/services';
 import { swalConfig } from '../../lib/sweetAlert';
 
 interface CheckoutModalProps {
@@ -410,6 +410,51 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setCompletedSale(savedSale);
       onComplete(savedSale);
       setIsProcessing(false);
+
+      // AUTO: if any split payment uses credit OR single method is credit, create outstanding_payments entry
+      try {
+        const isCreditSale = salePayments.some(p => p.method === 'credit') || savedSale.status === 'credit';
+        const creditToggles = (state.settings as any).featureToggles;
+        const featureEnabled = !creditToggles || !!creditToggles.outstandingPayments;
+        if (isCreditSale && featureEnabled && savedSale.status === 'credit') {
+          const creditPaidSoFar = salePayments.reduce((s, p) => s + (p.method === 'credit' ? 0 : p.amount), 0);
+          const creditAmount = savedSale.total - creditPaidSoFar;
+          if (creditAmount > 0) {
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30); // default 30-day credit terms
+            const opEntry = {
+              customerId: savedSale.customerId,
+              customerName: savedSale.customerName || 'Walk-in Customer',
+              saleId: savedSale.id,
+              invoiceNumber: savedSale.invoiceNumber,
+              totalAmount: savedSale.total,
+              paidAmount: creditPaidSoFar,
+              outstandingAmount: creditAmount,
+              issueDate: new Date(savedSale.timestamp as any || new Date()),
+              dueDate,
+              status: (creditPaidSoFar > 0 ? 'partial' : 'pending') as any,
+              paymentHistory: [],
+              notes: creditNotes ? creditNotes : undefined,
+            };
+            try {
+              const created = await outstandingPaymentsService.create(opEntry);
+              dispatch({ type: 'ADD_OUTSTANDING_PAYMENT', payload: created });
+            } catch (svcErr) {
+              // Fallback to local state only
+              console.warn('Could not save O/S entry to Supabase (likely tables not migrated yet):', svcErr);
+              const fallbackEntry: any = {
+                ...opEntry,
+                id: 'op-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              };
+              dispatch({ type: 'ADD_OUTSTANDING_PAYMENT', payload: fallbackEntry });
+            }
+          }
+        }
+      } catch (osErr) {
+        console.error('Auto O/S entry error (non-fatal):', osErr);
+      }
       
       // Always show receipt print modal after successful payment
       setShowReceipt(true);
