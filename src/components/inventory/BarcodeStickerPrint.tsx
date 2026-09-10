@@ -89,19 +89,19 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   useEffect(() => {
     if (!isOpen || !product) return;
     const isRollMode = layoutMode === 'roll-35x25';
-    const h = isRollMode ? 26 : 40;
-    const fs = isRollMode ? 8 : 11;
+    const h = isRollMode ? 22 : 34;
+    const fs = isRollMode ? 11 : 14;
     const bw = isRollMode ? 2 : 2;
-    renderBarcodes(previewSvgs, h, fs, bw, true, 0, 2);
+    renderBarcodes(previewSvgs, h, fs, bw, true, 0, 3);
   }, [isOpen, product?.id, product?.barcode, stickerCount, layoutMode]);
 
   if (!isOpen || !product) return null;
 
   const handlePrint = () => {
     if (layoutMode === 'roll-35x25') {
-      renderBarcodes(printSvgs, 28, 9, 2, true, 0, 2);
+      renderBarcodes(printSvgs, 24, 12, 2, true, 0, 3);
     } else {
-      renderBarcodes(printSvgs, 42, 11, 2, true, 0, 2);
+      renderBarcodes(printSvgs, 36, 15, 2, true, 0, 4);
     }
 
     setTimeout(() => {
@@ -213,7 +213,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             style={{
               width: '100%',
               maxWidth: '100%',
-              height: isPrint ? '14mm' : '38px',
+              height: isPrint ? '16mm' : '44px',
               display: 'block',
               flex: '0 0 auto',
               shapeRendering: 'crispEdges',
@@ -224,7 +224,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           <div
             className="text-center font-semibold leading-none w-full"
             style={{
-              fontSize: isPrint ? '5.5pt' : '6.5px',
+              fontSize: isPrint ? '5.5pt' : '6px',
               lineHeight: 1,
             }}
           >
@@ -279,7 +279,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           style={{
             width: '100%',
             maxWidth: '100%',
-            height: isPrint ? '18mm' : '40px',
+            height: isPrint ? '22mm' : '48px',
             display: 'block',
             shapeRendering: 'crispEdges',
             overflow: 'visible',
