@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X, Printer, Plus, Minus } from 'lucide-react';
 import { Product } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
-import { renderBarcodeToCanvas } from '../../lib/barcodeUtils';
+import { renderBarcodeToSvg } from '../../lib/barcodeUtils';
 
 interface BarcodeStickerPrintProps {
   isOpen: boolean;
@@ -53,20 +53,23 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   const { state } = useApp();
   const [stickerCount, setStickerCount] = useState(1);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('roll-35x25');
-  const previewCanvases = useRef<Map<number, HTMLCanvasElement>>(new Map());
-  const printCanvases = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  const previewSvgs = useRef<Map<number, SVGSVGElement>>(new Map());
+  const printSvgs = useRef<Map<number, SVGSVGElement>>(new Map());
 
   const renderBarcodes = (
-    refMap: React.MutableRefObject<Map<number, HTMLCanvasElement>>,
+    refMap: React.MutableRefObject<Map<number, SVGSVGElement>>,
     height: number,
     fontSize: number,
     barWidth: number,
     displayValue: boolean = true,
   ) => {
     if (!product?.barcode) return;
-    refMap.current.forEach((canvas) => {
-      if (canvas) {
-        renderBarcodeToCanvas(canvas, product.barcode!, {
+    refMap.current.forEach((svg) => {
+      if (svg) {
+        while (svg.firstChild) {
+          svg.removeChild(svg.firstChild);
+        }
+        renderBarcodeToSvg(svg, product.barcode!, {
           height,
           fontSize,
           width: barWidth,
@@ -82,17 +85,17 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     const isRollMode = layoutMode === 'roll-35x25';
     const h = isRollMode ? 28 : 42;
     const fs = isRollMode ? 6 : 8;
-    const bw = isRollMode ? 1 : 1;
-    renderBarcodes(previewCanvases, h, fs, bw, !isRollMode);
+    const bw = isRollMode ? 2 : 2;
+    renderBarcodes(previewSvgs, h, fs, bw, !isRollMode);
   }, [isOpen, product?.id, product?.barcode, stickerCount, layoutMode]);
 
   if (!isOpen || !product) return null;
 
   const handlePrint = () => {
     if (layoutMode === 'roll-35x25') {
-      renderBarcodes(printCanvases, 30, 7, 1, false);
+      renderBarcodes(printSvgs, 30, 7, 2, false);
     } else {
-      renderBarcodes(printCanvases, 52, 9, 1.2);
+      renderBarcodes(printSvgs, 52, 9, 2);
     }
 
     setTimeout(() => {
@@ -103,17 +106,19 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
       clone.id = 'sticker-print-area-clone';
       clone.style.cssText = 'display:block;position:absolute;left:0;top:0;width:100%;padding:0;z-index:99999;background:#fff';
 
-      const origC = src.querySelectorAll('canvas');
-      clone.querySelectorAll('canvas').forEach((c, i) => {
-        const t = c as HTMLCanvasElement;
-        const s = origC[i] as HTMLCanvasElement;
+      const origSvgs = src.querySelectorAll('svg');
+      clone.querySelectorAll('svg').forEach((c, i) => {
+        const t = c as SVGSVGElement;
+        const s = origSvgs[i] as SVGSVGElement;
         if (t && s) {
-          t.width = s.width;
-          t.height = s.height;
-          t.style.width = '100%';
-          t.style.height = 'auto';
-          const ctx = t.getContext('2d');
-          if (ctx) ctx.drawImage(s, 0, 0);
+          const vb = s.getAttribute('viewBox');
+          if (vb) t.setAttribute('viewBox', vb);
+          const w = s.getAttribute('width');
+          if (w) t.setAttribute('width', w);
+          const h = s.getAttribute('height');
+          if (h) t.setAttribute('height', h);
+          while (t.firstChild) t.removeChild(t.firstChild);
+          Array.from(s.childNodes).forEach((n) => t.appendChild(n.cloneNode(true)));
         }
       });
 
@@ -131,12 +136,12 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     }, 500);
   };
 
-  const setPreviewRef = (i: number) => (el: HTMLCanvasElement | null) => {
-    if (el) previewCanvases.current.set(i, el);
+  const setPreviewRef = (i: number) => (el: SVGSVGElement | null) => {
+    if (el) previewSvgs.current.set(i, el);
   };
 
-  const setPrintRef = (i: number) => (el: HTMLCanvasElement | null) => {
-    if (el) printCanvases.current.set(i, el);
+  const setPrintRef = (i: number) => (el: SVGSVGElement | null) => {
+    if (el) printSvgs.current.set(i, el);
   };
 
   const priceText = product.isWeightBased
@@ -149,10 +154,10 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   const previewH = isRoll ? PREVIEW_H_ROLL : PREVIEW_H_SHEET;
 
   const StickerContent = ({
-    canvasRef,
+    svgRef,
     isPrint,
   }: {
-    canvasRef: (el: HTMLCanvasElement | null) => void;
+    svgRef: (el: SVGSVGElement | null) => void;
     isPrint: boolean;
   }) => {
     if (isRoll) {
@@ -182,8 +187,9 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             </div>
           )}
 
-          <canvas
-            ref={canvasRef}
+          <svg
+            ref={svgRef}
+            xmlns="http://www.w3.org/2000/svg"
             style={{
               width: '100%',
               height: isPrint ? 'auto' : '40px',
@@ -235,8 +241,9 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           {priceText}
         </div>
 
-        <canvas
-          ref={canvasRef}
+        <svg
+          ref={svgRef}
+          xmlns="http://www.w3.org/2000/svg"
           style={{
             width: '100%',
             height: isPrint ? 'auto' : '44px',
@@ -368,7 +375,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                     className="border border-gray-300 shadow-md mx-auto"
                     style={{ width: `${previewW}px`, height: `${previewH}px` }}
                   >
-                    <StickerContent canvasRef={setPreviewRef(i)} isPrint={false} />
+                    <StickerContent svgRef={setPreviewRef(i)} isPrint={false} />
                   </div>
                 ))}
                 {stickerCount > 30 && (
@@ -403,7 +410,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                     justifyContent: 'center',
                   }}
                 >
-                  <StickerContent canvasRef={setPrintRef(stickerIdx)} isPrint={true} />
+                  <StickerContent svgRef={setPrintRef(stickerIdx)} isPrint={true} />
                 </div>
               );
             }
@@ -442,7 +449,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                         }}
                       >
                         {hasSticker && (
-                          <StickerContent canvasRef={setPrintRef(stickerIdx)} isPrint={true} />
+                          <StickerContent svgRef={setPrintRef(stickerIdx)} isPrint={true} />
                         )}
                       </div>
                     );
@@ -478,6 +485,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                 position: absolute; left: 0; top: 0; width: 100%;
               }
               #sticker-print-area-clone, #sticker-print-area-clone * { visibility: visible !important; }
+              #sticker-print-area-clone svg { shape-rendering: crispEdges; }
               @page {
                 size: ${pageSizeW}mm ${pageSizeH}mm;
                 margin: 0mm;

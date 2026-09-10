@@ -51,6 +51,35 @@ export function renderBarcodeToCanvas(
   }
 }
 
+export function renderBarcodeToSvg(
+  svgElement: SVGSVGElement,
+  barcodeValue: string,
+  options?: {
+    format?: string;
+    width?: number;
+    height?: number;
+    displayValue?: boolean;
+    fontSize?: number;
+    margin?: number;
+  }
+): void {
+  try {
+    JsBarcode(svgElement, barcodeValue, {
+      format: options?.format || 'CODE128',
+      width: options?.width || 2,
+      height: options?.height || 60,
+      displayValue: options?.displayValue !== false,
+      fontSize: options?.fontSize || 14,
+      margin: options?.margin ?? 8,
+      background: '#ffffff',
+      lineColor: '#000000',
+      flat: true,
+    });
+  } catch (error) {
+    console.error('Error rendering SVG barcode:', error);
+  }
+}
+
 export function barcodeToDataURL(
   barcodeValue: string,
   options?: {
