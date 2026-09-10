@@ -1,32 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
-import { renderBarcodeToSvg } from '../../lib/barcodeUtils';
+import { renderOptimizedPrintBarcodeSvg, BARCODE_DEFAULTS } from '../../lib/barcodeUtils';
 import { X, Printer, Minus, Plus } from 'lucide-react';
 
 const STICKER_CONFIG = {
-  stickerWidthMm: 40,
-  stickerHeightMm: 27,
+  stickerWidthMm: 38,
+  stickerHeightMm: 25,
   mediaWidthMm: 80,
-  marginLeftMm: 1.0,
-  marginRightMm: 1.0,
-  marginTopMm: 0.8,
-  marginBottomMm: 0.8,
+  marginLeftMm: 0.6,
+  marginRightMm: 0.6,
+  marginTopMm: 0.4,
+  marginBottomMm: 0.4,
 
-  companyNameHeightMm: 2.0,
-  productNameBaseHeightMm: 2.0,
+  companyNameHeightMm: 1.8,
+  productNameBaseHeightMm: 1.9,
   productNameMaxLines: 2,
-  priceHeightMm: 3.0,
-  barcodeNumberHeightMm: 3.8,
+  priceHeightMm: 2.8,
+  barcodeNumberHeightMm: 3.2,
 
-  gapMm: 0.3,
+  gapMm: 0.2,
 
   barcodeWidthMm: 36.8,
-  barcodeMinHeightMm: 10.5,
-  barcodeMaxHeightMm: 12.0,
+  barcodeMinHeightMm: 12.0,
+  barcodeMaxHeightMm: 14.5,
 
   companyNameFontSizePt: 5.5,
-  productNameFontSizePt: 5.5,
+  productNameFontSizePt: 5.6,
   productNameFontSizeSmallPt: 5.0,
   priceFontSizePt: 8.5,
   barcodeNumberFontSizePt: 9,
@@ -200,6 +200,22 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
       const stickerEl = document.getElementById('barcode-sticker-sheet');
       if (!stickerEl) return;
 
+      const pageSizeCss =
+        mode === 'thermal'
+          ? `@page { size: ${STICKER_CONFIG.stickerWidthMm}mm ${STICKER_CONFIG.stickerHeightMm}mm; margin: 0mm; }`
+          : `@page { size: A4 portrait; margin: 0mm; }`;
+      const extraStyle = document.createElement('style');
+      extraStyle.setAttribute('id', 'barcode-dynamic-page-style');
+      extraStyle.textContent =
+        `@media print { ${pageSizeCss}
+          @page { margin: 0mm; }
+          html, body { zoom: 1 !important; -webkit-transform: none !important; transform: none !important; transform-origin: top left !important; }
+          svg { shape-rendering: crispEdges !important; image-rendering: pixelated !important; }
+          svg rect, svg path { shape-rendering: crispEdges !important; }
+          #barcode-sticker-print-root { transform: none !important; }
+        }`;
+      document.head.appendChild(extraStyle);
+
       const clone = stickerEl.cloneNode(true) as HTMLElement;
       clone.id = 'barcode-sticker-print-root';
       clone.style.position = 'absolute';
@@ -209,6 +225,8 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
       clone.style.background = '#ffffff';
       clone.style.display = 'block';
       clone.style.visibility = 'visible';
+      clone.style.transform = 'none';
+      clone.style.zoom = '1';
 
       const bodyChildren = Array.from(document.body.children) as HTMLElement[];
       bodyChildren.forEach((c) => c.classList.add('print-body-hidden'));
@@ -221,8 +239,9 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
 
       setTimeout(() => {
         clone.remove();
+        extraStyle.remove();
         bodyChildren.forEach((c) => c.classList.remove('print-body-hidden'));
-      }, 300);
+      }, 400);
     }, 120);
   };
 
@@ -543,9 +562,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
 
         <style>{`
           @media print {
-            @page {
-              margin: 0mm;
-            }
+            @page { margin: 0mm; }
 
             html, body {
               margin: 0 !important;
@@ -553,6 +570,9 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
               background: #ffffff !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
+              -webkit-transform: none !important;
+              transform: none !important;
+              zoom: 1 !important;
             }
 
             .no-print { display: none !important; }
@@ -565,7 +585,6 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             #barcode-sticker-print-root,
             #barcode-sticker-print-root * {
               visibility: visible !important;
-              display: block !important;
             }
 
             #barcode-sticker-print-root {
@@ -574,29 +593,44 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
               top: 0 !important;
               margin: 0 !important;
               padding: 0 !important;
+              -webkit-transform: none !important;
+              transform: none !important;
+              transform-origin: top left !important;
+              zoom: 1 !important;
             }
 
             #barcode-sticker-print-root > div {
               margin: 0 !important;
               padding: 0 !important;
               box-sizing: border-box !important;
+              -webkit-transform: none !important;
+              transform: none !important;
+            }
+
+            #barcode-sticker-print-root svg,
+            #barcode-sticker-print-root svg * {
+              shape-rendering: crispEdges !important;
+              image-rendering: pixelated !important;
+              -webkit-transform: none !important;
+              transform: none !important;
+            }
+
+            #barcode-sticker-print-root svg {
+              max-width: none !important;
+              max-height: none !important;
             }
 
             #barcode-sticker-print-root[data-print-mode="thermal"] {
               width: ${STICKER_CONFIG.stickerWidthMm}mm !important;
             }
 
-            #barcode-sticker-print-root[data-print-mode="thermal"] @page {
-              size: ${STICKER_CONFIG.stickerWidthMm}mm ${STICKER_CONFIG.stickerHeightMm}mm;
-            }
-
             #barcode-sticker-print-root[data-print-mode="a4grid"] {
               width: ${A4_GRID_CONFIG.pageWidthMm}mm !important;
             }
 
-            #barcode-sticker-print-root[data-print-mode="a4grid"] @page {
-              size: A4 portrait;
-            }
+            #barcode-sticker-sheet > div:first-of-type { page-break-after: always; }
+            #barcode-sticker-print-root > div { page-break-after: always; }
+            #barcode-sticker-print-root > div:last-of-type { page-break-after: auto; }
           }
         `}</style>
       </div>
@@ -645,26 +679,16 @@ function StickerContent({
   useEffect(() => {
     if (!inlineBarcodeSvgRef.current || !barcodeValue) return;
     const svg = inlineBarcodeSvgRef.current;
-    const widthPx = (bc.width / 25.4) * 96;
-    const heightPx = (bc.height / 25.4) * 96;
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '100%');
-    svg.setAttribute('viewBox', `0 0 ${widthPx} ${heightPx}`);
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.innerHTML = '';
     try {
-      renderBarcodeToSvg(svg, barcodeValue, {
-        format: 'CODE128',
-        width: Math.max(1, Math.floor(widthPx / 60)),
-        height: heightPx,
+      renderOptimizedPrintBarcodeSvg(svg, barcodeValue, {
+        availableWidthMm: bc.width,
+        availableHeightMm: bc.height,
+        minModuleWidthMm: Math.max(
+          BARCODE_DEFAULTS.MIN_MODULE_WIDTH_MM,
+          2 * (1 / 8)
+        ),
+        quietZoneModules: BARCODE_DEFAULTS.QUIET_ZONE_MODULES,
         displayValue: false,
-        margin: 0,
-        marginTop: 0,
-        marginBottom: 0,
-        marginLeft: 0,
-        marginRight: 0,
-        background: '#ffffff',
-        lineColor: '#000000',
       });
     } catch (e) {
       console.error(e);
@@ -762,14 +786,19 @@ function StickerContent({
           width: mm(bc.width),
           height: mm(bc.height),
           background: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          transform: 'translateZ(0)',
         }}
       >
         <svg
           ref={inlineBarcodeSvgRef}
           style={{
-            width: '100%',
-            height: '100%',
             display: 'block',
+            imageRendering: 'pixelated',
+            shapeRendering: 'crispEdges',
           }}
         />
       </div>
