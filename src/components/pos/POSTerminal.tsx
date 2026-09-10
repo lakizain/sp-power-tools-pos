@@ -17,84 +17,7 @@ export function POSTerminal() {
   const [showCheckout, setShowCheckout] = useState(false);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
 
-  const handleBarcodeScan = useCallback((barcode: string) => {
-    const product = state.products.find(
-      (p: Product) => p.barcode === barcode || p.sku === barcode
-    );
-
-    if (product) {
-      if (product.isWeightBased) {
-        Swal.fire({
-          title: product.name,
-          text: 'Weight-based product detected. Please click on the product card to enter weight.',
-          icon: 'info',
-          confirmButtonText: 'OK',
-          timer: 3000,
-          timerProgressBar: true,
-        });
-      } else {
-        addToCartFromScanner(product);
-        Swal.fire({
-          title: 'Added!',
-          html: `<strong>${product.name}</strong><br/>SKU: ${product.sku}`,
-          icon: 'success',
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 1500,
-          timerProgressBar: true,
-        });
-      }
-    } else {
-      Swal.fire({
-        title: 'Product Not Found',
-        html: `No product found for barcode:<br/><strong>${barcode}</strong><br/><br/>Please add this product in Inventory Management first.`,
-        icon: 'warning',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#3b82f6',
-      });
-    }
-  }, [state.products]);
-
-  useBarcodeScanner({
-    onScan: handleBarcodeScan,
-    minLength: 3,
-    enabled: true,
-  });
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Backspace') return;
-
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        return;
-      }
-
-      if (state.cart.length === 0) return;
-
-      e.preventDefault();
-
-      const lastIndex = state.cart.length - 1;
-      dispatch({ type: 'REMOVE_FROM_CART', payload: lastIndex });
-
-      if (state.activeSalesTab) {
-        const newCart = state.cart.slice(0, -1);
-        dispatch({
-          type: 'UPDATE_SALES_TAB',
-          payload: {
-            id: state.activeSalesTab,
-            updates: { cart: newCart }
-          }
-        });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.cart, state.activeSalesTab, dispatch]);
-
-  const addToCartFromScanner = (product: Product) => {
+  const addToCartFromScanner = useCallback((product: Product) => {
     if (product.trackInventory && product.stock <= 0) return;
 
     const existingItemIndex = state.cart.findIndex(item =>
@@ -139,9 +62,87 @@ export function POSTerminal() {
         }
       });
     }
-  };
+  }, [state.cart, state.activeSalesTab, dispatch]);
 
-  const addToCart = (product: Product, weight?: number) => {
+  const handleBarcodeScan = useCallback((barcode: string) => {
+    const product = state.products.find(
+      (p: Product) => p.barcode === barcode || p.sku === barcode
+    );
+
+    if (product) {
+      if (product.isWeightBased) {
+        Swal.fire({
+          title: product.name,
+          text: 'Weight-based product detected. Please click on the product card to enter weight.',
+          icon: 'info',
+          confirmButtonText: 'OK',
+          timer: 3000,
+          timerProgressBar: true,
+        });
+      } else {
+        addToCartFromScanner(product);
+        Swal.fire({
+          title: 'Added!',
+          html: `<strong>${product.name}</strong><br/>SKU: ${product.sku}`,
+          icon: 'success',
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+        });
+      }
+    } else {
+      Swal.fire({
+        title: 'Product Not Found',
+        html: `No product found for barcode:<br/><strong>${barcode}</strong><br/><br/>Please add this product in Inventory Management first.`,
+        icon: 'warning',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#3b82f6',
+      });
+    }
+  }, [state.products, addToCartFromScanner]);
+
+  useBarcodeScanner({
+    onScan: handleBarcodeScan,
+    minLength: 3,
+    enabled: true,
+  });
+
+  const handleBackspace = useCallback((e: KeyboardEvent) => {
+    if (e.key !== 'Backspace') return;
+
+    const target = e.target as HTMLElement;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+
+    if (state.cart.length === 0) return;
+
+    e.preventDefault();
+
+    const lastIndex = state.cart.length - 1;
+    const newCart = state.cart.slice(0, -1);
+
+    dispatch({ type: 'REMOVE_FROM_CART', payload: lastIndex });
+
+    if (state.activeSalesTab) {
+      dispatch({
+        type: 'UPDATE_SALES_TAB',
+        payload: {
+          id: state.activeSalesTab,
+          updates: { cart: newCart }
+        }
+      });
+    }
+  }, [state.cart, state.activeSalesTab, dispatch]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleBackspace);
+    return () => window.removeEventListener('keydown', handleBackspace);
+  }, [handleBackspace]);
+
+  const addToCart = useCallback((product: Product, weight?: number) => {
     // Only check stock if inventory tracking is enabled
     if (product.trackInventory && product.stock <= 0) return;
 
@@ -196,7 +197,7 @@ export function POSTerminal() {
         }
       });
     }
-  };
+  }, [state.cart, state.activeSalesTab, dispatch]);
 
   const handleCheckout = () => {
     setShowCheckout(true);
