@@ -21,9 +21,9 @@ const STICKER_CONFIG = {
 
   gapMm: 0.3,
 
-  barcodeWidthMm: 34.8,
-  barcodeMinHeightMm: 8.5,
-  barcodeMaxHeightMm: 10,
+  barcodeWidthMm: 36.8,
+  barcodeMinHeightMm: 10.5,
+  barcodeMaxHeightMm: 12.0,
 
   companyNameFontSizePt: 5.5,
   productNameFontSizePt: 5.5,
@@ -39,8 +39,8 @@ const A4_GRID_CONFIG = {
   rows: 8,
   marginXMm: 9,
   marginYMm: 6.5,
-  horizontalGapMm: 12,
-  verticalGapMm: 12,
+  horizontalGapMm: 10,
+  verticalGapMm: 9,
   showBorder: true,
 } as const;
 
