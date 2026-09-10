@@ -71,24 +71,25 @@ export function renderBarcodeToSvg(
   }
 ): void {
   try {
+    svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     JsBarcode(svgElement, barcodeValue, {
       format: options?.format || 'CODE128',
       width: options?.width || 2,
       height: options?.height || 60,
       displayValue: options?.displayValue !== false,
       fontSize: options?.fontSize || 14,
-      margin: options?.margin ?? 8,
-      marginTop: options?.marginTop,
-      marginBottom: options?.marginBottom,
-      marginLeft: options?.marginLeft,
-      marginRight: options?.marginRight,
+      margin: options?.margin ?? 0,
+      marginTop: options?.marginTop ?? 0,
+      marginBottom: options?.marginBottom ?? 0,
+      marginLeft: options?.marginLeft ?? 0,
+      marginRight: options?.marginRight ?? 0,
       textAlign: options?.textAlign || 'center',
       textPosition: options?.textPosition || 'bottom',
       font: options?.font || 'monospace',
       background: '#ffffff',
       lineColor: '#000000',
-      flat: true,
     });
+    svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   } catch (error) {
     console.error('Error rendering SVG barcode:', error);
   }

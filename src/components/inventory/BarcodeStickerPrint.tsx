@@ -89,19 +89,19 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   useEffect(() => {
     if (!isOpen || !product) return;
     const isRollMode = layoutMode === 'roll-35x25';
-    const h = isRollMode ? 38 : 56;
-    const fs = isRollMode ? 9 : 12;
-    const bw = isRollMode ? 2.5 : 2.5;
-    renderBarcodes(previewSvgs, h, fs, bw, true, 0, 3);
+    const h = isRollMode ? 26 : 40;
+    const fs = isRollMode ? 8 : 11;
+    const bw = isRollMode ? 2 : 2;
+    renderBarcodes(previewSvgs, h, fs, bw, true, 0, 2);
   }, [isOpen, product?.id, product?.barcode, stickerCount, layoutMode]);
 
   if (!isOpen || !product) return null;
 
   const handlePrint = () => {
     if (layoutMode === 'roll-35x25') {
-      renderBarcodes(printSvgs, 44, 11, 2.5, true, 0, 4);
+      renderBarcodes(printSvgs, 28, 9, 2, true, 0, 2);
     } else {
-      renderBarcodes(printSvgs, 72, 14, 2.5, true, 0, 4);
+      renderBarcodes(printSvgs, 42, 11, 2, true, 0, 2);
     }
 
     setTimeout(() => {
@@ -123,6 +123,11 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           if (w) t.setAttribute('width', w);
           const h = s.getAttribute('height');
           if (h) t.setAttribute('height', h);
+          const par = s.getAttribute('preserveAspectRatio');
+          if (par) t.setAttribute('preserveAspectRatio', par);
+          else t.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+          const shapeRendering = s.getAttribute('shape-rendering');
+          if (shapeRendering) t.setAttribute('shape-rendering', shapeRendering);
           while (t.firstChild) t.removeChild(t.firstChild);
           Array.from(s.childNodes).forEach((n) => t.appendChild(n.cloneNode(true)));
         }
@@ -173,11 +178,11 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           style={{
             width: isPrint ? `${blockWmm}mm` : `${previewW}px`,
             height: isPrint ? `${ROLL_BLOCK_H_MM}mm` : `${previewH}px`,
-            padding: isPrint ? '0.3mm 0mm 0.3mm 0mm' : '0.5px 0px 0.5px 0px',
+            padding: isPrint ? '0.2mm 0.3mm 0.2mm 0.3mm' : '0.5px 1px 0.5px 1px',
             boxSizing: 'border-box',
-            overflow: 'hidden',
+            overflow: 'visible',
             fontFamily: 'Arial, sans-serif',
-            gap: isPrint ? '0.2mm' : '0.5px',
+            gap: isPrint ? '0.15mm' : '0.5px',
           }}
         >
           <div
@@ -191,14 +196,28 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             S&amp;P POWER TOOLS
           </div>
 
+          <div
+            className="text-center font-semibold leading-tight w-full truncate"
+            style={{
+              fontSize: isPrint ? '5pt' : '5.5px',
+              lineHeight: 1,
+            }}
+          >
+            {product.name}
+          </div>
+
           <svg
             ref={svgRef}
             xmlns="http://www.w3.org/2000/svg"
+            preserveAspectRatio="xMidYMid meet"
             style={{
               width: '100%',
-              height: isPrint ? 'auto' : '52px',
+              maxWidth: '100%',
+              height: isPrint ? '14mm' : '38px',
               display: 'block',
-              flex: 1,
+              flex: '0 0 auto',
+              shapeRendering: 'crispEdges',
+              overflow: 'visible',
             }}
           />
 
@@ -221,9 +240,9 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         style={{
           width: isPrint ? `${blockWmm}mm` : `${previewW}px`,
           height: isPrint ? 'auto' : `${previewH}px`,
-          padding: isPrint ? '0.2mm 0 0.2mm 0' : '1px',
+          padding: isPrint ? '0.2mm 0.2mm 0.2mm 0.2mm' : '1px',
           boxSizing: 'border-box',
-          overflow: 'hidden',
+          overflow: 'visible',
           fontFamily: 'Arial, sans-serif',
           gap: isPrint ? '0.4mm' : '1px',
         }}
@@ -256,10 +275,14 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         <svg
           ref={svgRef}
           xmlns="http://www.w3.org/2000/svg"
+          preserveAspectRatio="xMidYMid meet"
           style={{
             width: '100%',
-            height: isPrint ? 'auto' : '56px',
+            maxWidth: '100%',
+            height: isPrint ? '18mm' : '40px',
             display: 'block',
+            shapeRendering: 'crispEdges',
+            overflow: 'visible',
           }}
         />
 
