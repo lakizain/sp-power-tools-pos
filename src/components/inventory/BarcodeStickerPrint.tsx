@@ -2,34 +2,34 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { renderBarcodeToSvg } from '../../lib/barcodeUtils';
-import { X, Printer } from 'lucide-react';
+import { X, Printer, Minus, Plus } from 'lucide-react';
 
 const STICKER_CONFIG = {
-  stickerWidthMm: 42,
-  stickerHeightMm: 30,
+  stickerWidthMm: 40,
+  stickerHeightMm: 27,
   mediaWidthMm: 80,
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
   marginTopMm: 0.8,
   marginBottomMm: 0.8,
 
-  companyNameHeightMm: 2.2,
-  productNameBaseHeightMm: 2.2,
+  companyNameHeightMm: 2.0,
+  productNameBaseHeightMm: 2.0,
   productNameMaxLines: 2,
-  priceHeightMm: 3.4,
-  barcodeNumberHeightMm: 4.2,
+  priceHeightMm: 3.0,
+  barcodeNumberHeightMm: 3.8,
 
   gapMm: 0.3,
 
-  barcodeWidthMm: 38.8,
-  barcodeMinHeightMm: 13.5,
-  barcodeMaxHeightMm: 15.0,
+  barcodeWidthMm: 36.8,
+  barcodeMinHeightMm: 10.5,
+  barcodeMaxHeightMm: 12.0,
 
-  companyNameFontSizePt: 6.0,
-  productNameFontSizePt: 6.0,
-  productNameFontSizeSmallPt: 5.5,
-  priceFontSizePt: 9.5,
-  barcodeNumberFontSizePt: 10,
+  companyNameFontSizePt: 5.5,
+  productNameFontSizePt: 5.5,
+  productNameFontSizeSmallPt: 5.0,
+  priceFontSizePt: 8.5,
+  barcodeNumberFontSizePt: 9,
 } as const;
 
 const A4_GRID_CONFIG = {
@@ -37,10 +37,10 @@ const A4_GRID_CONFIG = {
   pageHeightMm: 297,
   columns: 4,
   rows: 8,
-  marginXMm: 7,
-  marginYMm: 6,
-  horizontalGapMm: 9,
-  verticalGapMm: 6,
+  marginXMm: 9,
+  marginYMm: 6.5,
+  horizontalGapMm: 10,
+  verticalGapMm: 9,
   showBorder: true,
 } as const;
 
@@ -176,7 +176,7 @@ export interface BarcodeStickerPrintProps {
 export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
   const { state } = useApp();
   const [copies, setCopies] = useState(1);
-  const [mode, setMode] = useState<PrintMode>('a4grid');
+  const [mode, setMode] = useState<PrintMode>('thermal');
 
   const companyName = state.settings.storeName || '';
   const productName = product?.name || '';
@@ -466,16 +466,51 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                 </div>
               </div>
 
-              <p className="text-xs text-gray-500">
-                {mode === 'thermal'
-                  ? `Sticker: ${stickerWidthMm}×${stickerHeightMm}mm · Left-aligned on 80mm media`
-                  : `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Gaps: ${A4_GRID_CONFIG.horizontalGapMm}/${A4_GRID_CONFIG.verticalGapMm}mm`}
-                {mode === 'a4grid' && copies > 0 && (
-                  <span className="ml-2 font-medium">
-                    · Pages: {totalPages}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Number of Stickers
+                </label>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setCopies((c) => Math.max(1, c - 1))}
+                    className="btn btn-secondary btn-md"
+                    disabled={copies <= 1}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="text-lg font-bold text-gray-900 w-16 text-center">
+                    {copies}
                   </span>
-                )}
-              </p>
+                  <button
+                    onClick={() => setCopies((c) => Math.min(500, c + 1))}
+                    className="btn btn-secondary btn-md"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setCopies(32)}
+                    className="btn btn-secondary btn-sm text-xs"
+                  >
+                    32
+                  </button>
+                  <button
+                    onClick={() => setCopies(stickersPerPage)}
+                    className="btn btn-secondary btn-sm text-xs"
+                  >
+                    Full Sheet
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {mode === 'thermal'
+                    ? `Sticker: ${stickerWidthMm}×${stickerHeightMm}mm · Left-aligned on 80mm media`
+                    : `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Gaps: ${A4_GRID_CONFIG.horizontalGapMm}/${A4_GRID_CONFIG.verticalGapMm}mm`}
+                  {mode === 'a4grid' && copies > 0 && (
+                    <span className="ml-2 font-medium">
+                      · Pages: {totalPages}
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
 
