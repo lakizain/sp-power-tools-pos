@@ -5,8 +5,8 @@ import { renderBarcodeToSvg } from '../../lib/barcodeUtils';
 import { X, Printer, Minus, Plus } from 'lucide-react';
 
 const STICKER_CONFIG = {
-  stickerWidthMm: 38,
-  stickerHeightMm: 25,
+  stickerWidthMm: 40,
+  stickerHeightMm: 27,
   mediaWidthMm: 80,
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
@@ -37,7 +37,7 @@ const A4_GRID_CONFIG = {
   pageHeightMm: 297,
   columns: 4,
   rows: 8,
-  marginXMm: 11,
+  marginXMm: 9,
   marginYMm: 6.5,
   horizontalGapMm: 12,
   verticalGapMm: 12,
