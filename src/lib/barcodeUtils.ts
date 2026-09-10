@@ -61,6 +61,13 @@ export function renderBarcodeToSvg(
     displayValue?: boolean;
     fontSize?: number;
     margin?: number;
+    marginTop?: number;
+    marginBottom?: number;
+    marginLeft?: number;
+    marginRight?: number;
+    textAlign?: 'left' | 'center' | 'right';
+    textPosition?: 'top' | 'bottom';
+    font?: string;
   }
 ): void {
   try {
@@ -71,6 +78,13 @@ export function renderBarcodeToSvg(
       displayValue: options?.displayValue !== false,
       fontSize: options?.fontSize || 14,
       margin: options?.margin ?? 8,
+      marginTop: options?.marginTop,
+      marginBottom: options?.marginBottom,
+      marginLeft: options?.marginLeft,
+      marginRight: options?.marginRight,
+      textAlign: options?.textAlign || 'center',
+      textPosition: options?.textPosition || 'bottom',
+      font: options?.font || 'monospace',
       background: '#ffffff',
       lineColor: '#000000',
       flat: true,

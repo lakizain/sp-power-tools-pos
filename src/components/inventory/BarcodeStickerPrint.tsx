@@ -62,6 +62,8 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     fontSize: number,
     barWidth: number,
     displayValue: boolean = true,
+    marginTop: number = 0,
+    marginBottom: number = 2,
   ) => {
     if (!product?.barcode) return;
     refMap.current.forEach((svg) => {
@@ -74,7 +76,11 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           fontSize,
           width: barWidth,
           margin: 0,
+          marginTop,
+          marginBottom,
           displayValue,
+          font: 'Arial, monospace',
+          textAlign: 'center',
         });
       }
     });
@@ -83,19 +89,19 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   useEffect(() => {
     if (!isOpen || !product) return;
     const isRollMode = layoutMode === 'roll-35x25';
-    const h = isRollMode ? 28 : 42;
-    const fs = isRollMode ? 6 : 8;
-    const bw = isRollMode ? 2 : 2;
-    renderBarcodes(previewSvgs, h, fs, bw, !isRollMode);
+    const h = isRollMode ? 38 : 56;
+    const fs = isRollMode ? 9 : 12;
+    const bw = isRollMode ? 2.5 : 2.5;
+    renderBarcodes(previewSvgs, h, fs, bw, true, 0, 3);
   }, [isOpen, product?.id, product?.barcode, stickerCount, layoutMode]);
 
   if (!isOpen || !product) return null;
 
   const handlePrint = () => {
     if (layoutMode === 'roll-35x25') {
-      renderBarcodes(printSvgs, 30, 7, 2, false);
+      renderBarcodes(printSvgs, 44, 11, 2.5, true, 0, 4);
     } else {
-      renderBarcodes(printSvgs, 52, 9, 2);
+      renderBarcodes(printSvgs, 72, 14, 2.5, true, 0, 4);
     }
 
     setTimeout(() => {
@@ -163,39 +169,48 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     if (isRoll) {
       return (
         <div
-          className="flex flex-col items-start justify-start bg-white text-black"
+          className="flex flex-col items-start justify-between bg-white text-black"
           style={{
             width: isPrint ? `${blockWmm}mm` : `${previewW}px`,
             height: isPrint ? `${ROLL_BLOCK_H_MM}mm` : `${previewH}px`,
-            padding: isPrint ? '1mm 0mm 1mm 0mm' : '2px 0px 2px 0px',
+            padding: isPrint ? '0.3mm 0mm 0.3mm 0mm' : '0.5px 0px 0.5px 0px',
             boxSizing: 'border-box',
             overflow: 'hidden',
             fontFamily: 'Arial, sans-serif',
-            gap: isPrint ? '1mm' : '4px',
-            justifyContent: 'center',
+            gap: isPrint ? '0.2mm' : '0.5px',
           }}
         >
-          {state.settings.storeName && (
-            <div
-              className="text-left font-bold leading-tight w-full truncate"
-              style={{
-                fontSize: isPrint ? '7pt' : '8px',
-                paddingLeft: isPrint ? '0mm' : '1px',
-              }}
-            >
-              {state.settings.storeName}
-            </div>
-          )}
+          <div
+            className="text-center font-bold uppercase w-full truncate tracking-tighter"
+            style={{
+              fontSize: isPrint ? '5pt' : '5.5px',
+              letterSpacing: isPrint ? '-0.05mm' : '-0.1px',
+              lineHeight: 1,
+            }}
+          >
+            S&amp;P POWER TOOLS
+          </div>
 
           <svg
             ref={svgRef}
             xmlns="http://www.w3.org/2000/svg"
             style={{
               width: '100%',
-              height: isPrint ? 'auto' : '40px',
+              height: isPrint ? 'auto' : '52px',
               display: 'block',
+              flex: 1,
             }}
           />
+
+          <div
+            className="text-center font-semibold leading-none w-full"
+            style={{
+              fontSize: isPrint ? '5.5pt' : '6.5px',
+              lineHeight: 1,
+            }}
+          >
+            {priceText}
+          </div>
         </div>
       );
     }
@@ -206,39 +221,36 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         style={{
           width: isPrint ? `${blockWmm}mm` : `${previewW}px`,
           height: isPrint ? 'auto' : `${previewH}px`,
-          padding: isPrint ? '0' : '2px',
+          padding: isPrint ? '0.2mm 0 0.2mm 0' : '1px',
           boxSizing: 'border-box',
           overflow: 'hidden',
           fontFamily: 'Arial, sans-serif',
+          gap: isPrint ? '0.4mm' : '1px',
         }}
       >
-        {state.settings.storeName && (
-          <div
-            className="text-center font-bold leading-tight uppercase w-full truncate"
-            style={{ fontSize: isPrint ? '8pt' : '8px' }}
-          >
-            {state.settings.storeName}
-          </div>
-        )}
+        <div
+          className="text-center font-bold uppercase w-full truncate tracking-tighter"
+          style={{
+            fontSize: isPrint ? '6pt' : '6px',
+            letterSpacing: isPrint ? '-0.05mm' : '-0.08px',
+            lineHeight: 1.05,
+          }}
+        >
+          S&amp;P POWER TOOLS
+        </div>
 
         <div
-          className="text-center font-bold leading-tight w-full overflow-hidden"
+          className="text-center font-semibold leading-tight w-full overflow-hidden"
           style={{
-            fontSize: isPrint ? '9pt' : '9px',
+            fontSize: isPrint ? '7pt' : '7px',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             lineClamp: 2,
+            lineHeight: 1.05,
           }}
         >
           {product.name}
-        </div>
-
-        <div
-          className="text-center font-extrabold leading-none"
-          style={{ fontSize: isPrint ? '13pt' : '13px' }}
-        >
-          {priceText}
         </div>
 
         <svg
@@ -246,10 +258,20 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           xmlns="http://www.w3.org/2000/svg"
           style={{
             width: '100%',
-            height: isPrint ? 'auto' : '44px',
+            height: isPrint ? 'auto' : '56px',
             display: 'block',
           }}
         />
+
+        <div
+          className="text-center font-bold leading-none w-full"
+          style={{
+            fontSize: isPrint ? '7.5pt' : '8px',
+            lineHeight: 1,
+          }}
+        >
+          {priceText}
+        </div>
       </div>
     );
   };
