@@ -82,7 +82,7 @@ export function CustomerManager() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-100 text-sm font-medium">Total Purchases</p>
-              <p className="text-xl md:text-2xl font-bold">$ {(totalPurchases || 0).toFixed(2)}</p>
+              <p className="text-xl md:text-2xl font-bold">$ {totalPurchases.toFixed(2)}</p>
             </div>
             <CreditCard className="h-8 w-8 text-green-200" />
           </div>
@@ -92,7 +92,7 @@ export function CustomerManager() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-purple-100 text-sm font-medium">Average Purchase</p>
-              <p className="text-xl md:text-2xl font-bold">$ {(averagePurchase || 0).toFixed(2)}</p>
+              <p className="text-xl md:text-2xl font-bold">$ {averagePurchase.toFixed(2)}</p>
             </div>
             <Mail className="h-8 w-8 text-purple-200" />
           </div>
@@ -178,7 +178,7 @@ export function CustomerManager() {
                     <div className="text-sm text-gray-500">{customer.phone}</div>
                   </td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                    $ {(customer.totalPurchases || 0).toFixed(2)}
+                    $ {customer.totalPurchases.toFixed(2)}
                   </td>
                   <td className="px-4 md:px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">

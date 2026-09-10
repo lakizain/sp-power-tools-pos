@@ -57,7 +57,7 @@ export function CurrencyDisplay({
                 // Fallback to basic formatting
                 const fallbackCurrency = currency || 'USD';
                 const fallbackSymbol = fallbackCurrency === 'USD' ? '$' : fallbackCurrency;
-                setFormattedAmount(`${fallbackSymbol}${(amount || 0).toFixed(2)}`);
+                setFormattedAmount(`${fallbackSymbol}${amount.toFixed(2)}`);
             } finally {
                 setIsLoading(false);
             }
@@ -103,7 +103,7 @@ export function SimpleCurrencyDisplay({ amount, currency = 'USD', className = ''
             } catch (error) {
                 // Fallback formatting
                 const symbol = currency === 'USD' ? '$' : currency;
-                setFormatted(`${symbol}${(amount || 0).toFixed(2)}`);
+                setFormatted(`${symbol}${amount.toFixed(2)}`);
             }
         };
 
@@ -148,7 +148,7 @@ export function CurrencyInput({
 
     useEffect(() => {
         if (!isFocused) {
-            setDisplayValue((value || 0).toFixed(decimalPlaces));
+            setDisplayValue(value.toFixed(decimalPlaces));
         }
     }, [value, decimalPlaces, isFocused]);
 
@@ -166,7 +166,7 @@ export function CurrencyInput({
         setIsFocused(false);
         const numericValue = parseFloat(displayValue);
         if (!isNaN(numericValue)) {
-            setDisplayValue((numericValue || 0).toFixed(decimalPlaces));
+            setDisplayValue(numericValue.toFixed(decimalPlaces));
         }
     };
 

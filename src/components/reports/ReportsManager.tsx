@@ -362,42 +362,42 @@ export function ReportsManager() {
         // Build payments string - prefer payments breakdown if available
         let paymentsStr = '';
         if (sale.payments && sale.payments.length > 0) {
-          paymentsStr = sale.payments.map(p => `${p.method}:${(p.amount || 0).toFixed(2)}`).join(';');
+          paymentsStr = sale.payments.map(p => `${p.method}:${p.amount.toFixed(2)}`).join(';');
         } else {
-          paymentsStr = `${sale.paymentMethod}:${(sale.total || 0).toFixed(2)}`;
+          paymentsStr = `${sale.paymentMethod}:${sale.total.toFixed(2)}`;
         }
         // Escape commas in customer name
         const safeCustomer = customerName.replace(/,/g, ' ');
-        return `${format(new Date(sale.timestamp), 'yyyy-MM-dd HH:mm:ss')},${sale.invoiceNumber},${safeCustomer},${itemCount},${(sale.total || 0).toFixed(2)},${(sale.discountAmount || 0).toFixed(2)},"${paymentsStr}",${sale.cashier}`;
+        return `${format(new Date(sale.timestamp), 'yyyy-MM-dd HH:mm:ss')},${sale.invoiceNumber},${safeCustomer},${itemCount},${sale.total.toFixed(2)},${sale.discountAmount.toFixed(2)},"${paymentsStr}",${sale.cashier}`;
       }).join('\n');
       fileName = `pos-sales-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     } else if (reportType === 'customers') {
       csvHeader = 'Customer Name,Total Spent,Total Transactions,Total Items,Avg Transaction Value,Last Purchase\n';
       csvData = customerData.map(customer => {
-        return `${customer.name},${(customer.totalSpent || 0).toFixed(2)},${customer.totalTransactions},${customer.totalItems},${(customer.avgTransactionValue || 0).toFixed(2)},${format(customer.lastPurchase, 'yyyy-MM-dd HH:mm:ss')}`;
+        return `${customer.name},${customer.totalSpent.toFixed(2)},${customer.totalTransactions},${customer.totalItems},${customer.avgTransactionValue.toFixed(2)},${format(customer.lastPurchase, 'yyyy-MM-dd HH:mm:ss')}`;
       }).join('\n');
       fileName = `pos-customers-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     } else if (reportType === 'inventory') {
       csvHeader = 'Product Name,SKU,Category,Current Stock,Min Stock,Stock Status,Cost Price,Selling Price,Stock Value,Potential Revenue,Sold Quantity,Revenue,Turnover Ratio,Profit Margin %,Active\n';
       csvData = inventoryData.map(item => {
-        return `${item.name},${item.sku},${item.category},${item.currentStock},${item.minStock},${item.stockStatus},${(item.costPrice || 0).toFixed(2)},${(item.sellingPrice || 0).toFixed(2)},${(item.stockValue || 0).toFixed(2)},${(item.potentialRevenue || 0).toFixed(2)},${item.soldQuantity},${(item.revenue || 0).toFixed(2)},${(item.turnoverRatio || 0).toFixed(2)},${(item.profitMargin || 0).toFixed(2)},${item.active ? 'Yes' : 'No'}`;
+        return `${item.name},${item.sku},${item.category},${item.currentStock},${item.minStock},${item.stockStatus},${item.costPrice.toFixed(2)},${item.sellingPrice.toFixed(2)},${item.stockValue.toFixed(2)},${item.potentialRevenue.toFixed(2)},${item.soldQuantity},${item.revenue.toFixed(2)},${item.turnoverRatio.toFixed(2)},${item.profitMargin.toFixed(2)},${item.active ? 'Yes' : 'No'}`;
       }).join('\n');
       fileName = `pos-inventory-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     } else if (reportType === 'profit') {
       csvHeader = 'Product,Category,Quantity Sold,Revenue,COGS,Gross Profit,Margin %\n';
       csvData = profitData.productProfit.map(item => {
-        return `${item.name.replace(/,/g, ' ')},${item.category.replace(/,/g, ' ')},${item.quantitySold},${(item.revenue || 0).toFixed(2)},${(item.cogs || 0).toFixed(2)},${(item.grossProfit || 0).toFixed(2)},${(item.margin || 0).toFixed(2)}`;
+        return `${item.name.replace(/,/g, ' ')},${item.category.replace(/,/g, ' ')},${item.quantitySold},${item.revenue.toFixed(2)},${item.cogs.toFixed(2)},${item.grossProfit.toFixed(2)},${item.margin.toFixed(2)}`;
       }).join('\n');
       
       // Add summary section
       csvData += '\n\n=== PROFIT SUMMARY ===\n';
-      csvData += `Total Revenue,${(profitData.totalRevenue || 0).toFixed(2)}\n`;
-      csvData += `Total COGS,${(profitData.totalCOGS || 0).toFixed(2)}\n`;
-      csvData += `Gross Profit,${(profitData.totalGrossProfit || 0).toFixed(2)}\n`;
-      csvData += `Gross Profit Margin %,${(profitData.grossProfitMargin || 0).toFixed(2)}\n`;
-      csvData += `Total Expenses,${(profitData.totalExpenses || 0).toFixed(2)}\n`;
-      csvData += `Net Profit,${(profitData.netProfit || 0).toFixed(2)}\n`;
-      csvData += `Net Profit Margin %,${(profitData.netProfitMargin || 0).toFixed(2)}\n`;
+      csvData += `Total Revenue,${profitData.totalRevenue.toFixed(2)}\n`;
+      csvData += `Total COGS,${profitData.totalCOGS.toFixed(2)}\n`;
+      csvData += `Gross Profit,${profitData.totalGrossProfit.toFixed(2)}\n`;
+      csvData += `Gross Profit Margin %,${profitData.grossProfitMargin.toFixed(2)}\n`;
+      csvData += `Total Expenses,${profitData.totalExpenses.toFixed(2)}\n`;
+      csvData += `Net Profit,${profitData.netProfit.toFixed(2)}\n`;
+      csvData += `Net Profit Margin %,${profitData.netProfitMargin.toFixed(2)}\n`;
       
       fileName = `pos-profit-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     }
@@ -503,7 +503,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-green-100 text-sm font-medium">Total Revenue</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(totalRevenue || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {totalRevenue.toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -527,7 +527,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-purple-100 text-sm font-medium">Avg. Transaction</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(averageTransaction || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {averageTransaction.toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -539,7 +539,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-orange-100 text-sm font-medium">Total Discounts</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(totalDiscounts || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {totalDiscounts.toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <Users className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -579,7 +579,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-purple-100 text-sm font-medium">Avg. Customer Value</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(((customerData.reduce((sum, c) => sum + c.totalSpent, 0) / Math.max(customerData.filter(c => c.totalTransactions > 0).length, 1))) || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(customerData.reduce((sum, c) => sum + c.totalSpent, 0) / Math.max(customerData.filter(c => c.totalTransactions > 0).length, 1)).toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -592,7 +592,7 @@ export function ReportsManager() {
               <div>
                 <p className="text-orange-100 text-sm font-medium">Top Customer</p>
                 <p className="text-lg lg:text-xl font-bold">{customerData[0]?.name || 'N/A'}</p>
-                <p className="text-orange-100 text-xs">{customerData[0] ? `${state.settings.currency} ${(customerData[0].totalSpent || 0).toFixed(2)}` : ''}</p>
+                <p className="text-orange-100 text-xs">{customerData[0] ? `${state.settings.currency} ${customerData[0].totalSpent.toFixed(2)}` : ''}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -632,7 +632,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-green-100 text-sm font-medium">Total Stock Value</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {((inventoryData.reduce((sum, item) => sum + item.stockValue, 0)) || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {inventoryData.reduce((sum, item) => sum + item.stockValue, 0).toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -644,7 +644,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-purple-100 text-sm font-medium">Potential Revenue</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {((inventoryData.reduce((sum, item) => sum + item.potentialRevenue, 0)) || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {inventoryData.reduce((sum, item) => sum + item.potentialRevenue, 0).toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -660,7 +660,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-green-100 text-sm font-medium">Total Revenue</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(profitData.totalRevenue || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalRevenue.toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -672,7 +672,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-blue-100 text-sm font-medium">Cost of Goods Sold</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(profitData.totalCOGS || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalCOGS.toFixed(2)}</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <ShoppingCart className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -684,8 +684,8 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-emerald-100 text-sm font-medium">Gross Profit</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(profitData.totalGrossProfit || 0).toFixed(2)}</p>
-                <p className="text-emerald-100 text-xs mt-1">Margin: {(profitData.grossProfitMargin || 0).toFixed(1)}%</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalGrossProfit.toFixed(2)}</p>
+                <p className="text-emerald-100 text-xs mt-1">Margin: {profitData.grossProfitMargin.toFixed(1)}%</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -697,7 +697,7 @@ export function ReportsManager() {
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-rose-100 text-sm font-medium">Total Expenses</p>
-                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {(profitData.totalExpenses || 0).toFixed(2)}</p>
+                <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalExpenses.toFixed(2)}</p>
                 <p className="text-rose-100 text-xs mt-1">{filteredExpenses.length} entries</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
@@ -711,9 +711,9 @@ export function ReportsManager() {
               <div>
                 <p className="text-indigo-100 text-sm font-medium">Net Profit</p>
                 <p className={`text-xl lg:text-2xl font-bold ${profitData.netProfit < 0 ? 'text-red-200' : ''}`}>
-                  {state.settings.currency} {(profitData.netProfit || 0).toFixed(2)}
+                  {state.settings.currency} {profitData.netProfit.toFixed(2)}
                 </p>
-                <p className="text-indigo-100 text-xs mt-1">Margin: {(profitData.netProfitMargin || 0).toFixed(1)}%</p>
+                <p className="text-indigo-100 text-xs mt-1">Margin: {profitData.netProfitMargin.toFixed(1)}%</p>
               </div>
               <div className="bg-white/20 p-3 rounded-2xl">
                 <PiggyBank className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -726,7 +726,7 @@ export function ReportsManager() {
               <div>
                 <p className="text-amber-100 text-sm font-medium">Profit per Transaction</p>
                 <p className="text-xl lg:text-2xl font-bold">
-                  {state.settings.currency} {totalTransactions > 0 ? (((profitData.netProfit / totalTransactions)) || 0).toFixed(2) : '0.00'}
+                  {state.settings.currency} {totalTransactions > 0 ? (profitData.netProfit / totalTransactions).toFixed(2) : '0.00'}
                 </p>
                 <p className="text-amber-100 text-xs mt-1">{totalTransactions} transactions</p>
               </div>
@@ -754,7 +754,7 @@ export function ReportsManager() {
                 <YAxis stroke="#6b7280" fontSize={12} />
                 <Tooltip 
                   formatter={(value: any, name: string) => [
-                    name === 'sales' ? `${state.settings.currency} ${((Number(value)) || 0).toFixed(2)}` : value,
+                    name === 'sales' ? `${state.settings.currency} ${Number(value).toFixed(2)}` : value,
                     name === 'sales' ? 'Sales' : 'Transactions'
                   ]}
                   contentStyle={{
@@ -800,7 +800,7 @@ export function ReportsManager() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${((percent * 100) || 0).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -810,7 +810,7 @@ export function ReportsManager() {
                   ))}
                 </Pie>
                 <Tooltip 
-                  formatter={(value: any) => [`${state.settings.currency} ${((Number(value)) || 0).toFixed(2)}`, 'Revenue']}
+                  formatter={(value: any) => [`${state.settings.currency} ${Number(value).toFixed(2)}`, 'Revenue']}
                   contentStyle={{
                     backgroundColor: 'white',
                     border: '1px solid #e5e7eb',
@@ -843,7 +843,7 @@ export function ReportsManager() {
                 <YAxis stroke="#6b7280" fontSize={12} />
                 <Tooltip 
                   formatter={(value: any, name: string) => [
-                    name === 'spending' ? `${state.settings.currency} ${((Number(value)) || 0).toFixed(2)}` : value,
+                    name === 'spending' ? `${state.settings.currency} ${Number(value).toFixed(2)}` : value,
                     name === 'spending' ? 'Total Spent' : 'Transactions'
                   ]}
                   contentStyle={{
@@ -888,7 +888,7 @@ export function ReportsManager() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${((percent * 100) || 0).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -928,7 +928,7 @@ export function ReportsManager() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${((percent * 100) || 0).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -974,7 +974,7 @@ export function ReportsManager() {
                       expenses: 'Expenses',
                       netProfit: 'Net Profit',
                     };
-                    return [`${state.settings.currency} ${((Number(value)) || 0).toFixed(2)}`, labels[name] || name];
+                    return [`${state.settings.currency} ${Number(value).toFixed(2)}`, labels[name] || name];
                   }}
                   contentStyle={{
                     backgroundColor: 'white',
@@ -1046,7 +1046,7 @@ export function ReportsManager() {
                       cogs: 'COGS',
                       grossProfit: 'Gross Profit',
                     };
-                    return [`${state.settings.currency} ${((Number(value)) || 0).toFixed(2)}`, labels[name] || name];
+                    return [`${state.settings.currency} ${Number(value).toFixed(2)}`, labels[name] || name];
                   }}
                   contentStyle={{
                     backgroundColor: 'white',
@@ -1075,7 +1075,7 @@ export function ReportsManager() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${((percent * 100) || 0).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   outerRadius={100}
                   fill="#8884d8"
                   dataKey="value"
@@ -1089,7 +1089,7 @@ export function ReportsManager() {
                 </Pie>
                 <Tooltip 
                   formatter={(value: any) => profitData.expenseByCategory.length > 0 
-                    ? [`${state.settings.currency} ${((Number(value)) || 0).toFixed(2)}`, 'Expense']
+                    ? [`${state.settings.currency} ${Number(value).toFixed(2)}`, 'Expense']
                     : [value, 'Status']
                   }
                   contentStyle={{
@@ -1140,10 +1140,10 @@ export function ReportsManager() {
                       <span className="badge badge-info">{product.quantity}</span>
                     </td>
                     <td className="table-cell font-semibold text-green-600">
-                      {state.settings.currency} {(product.revenue || 0).toFixed(2)}
+                      {state.settings.currency} {product.revenue.toFixed(2)}
                     </td>
                     <td className="table-cell text-gray-600">
-                      {state.settings.currency} {(((product.revenue / product.quantity)) || 0).toFixed(2)}
+                      {state.settings.currency} {(product.revenue / product.quantity).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -1185,7 +1185,7 @@ export function ReportsManager() {
                       </div>
                     </td>
                     <td className="table-cell font-semibold text-green-600">
-                      {state.settings.currency} {(customer.totalSpent || 0).toFixed(2)}
+                      {state.settings.currency} {customer.totalSpent.toFixed(2)}
                     </td>
                     <td className="table-cell">
                       <span className="badge badge-info">{customer.totalTransactions}</span>
@@ -1194,7 +1194,7 @@ export function ReportsManager() {
                       <span className="badge badge-secondary">{customer.totalItems}</span>
                     </td>
                     <td className="table-cell text-gray-600">
-                      {state.settings.currency} {(customer.avgTransactionValue || 0).toFixed(2)}
+                      {state.settings.currency} {customer.avgTransactionValue.toFixed(2)}
                     </td>
                     <td className="table-cell text-gray-600">
                       {format(customer.lastPurchase, 'MMM dd, yyyy')}
@@ -1260,13 +1260,13 @@ export function ReportsManager() {
                       </span>
                     </td>
                     <td className="table-cell font-semibold text-blue-600">
-                      {state.settings.currency} {(item.stockValue || 0).toFixed(2)}
+                      {state.settings.currency} {item.stockValue.toFixed(2)}
                     </td>
                     <td className="table-cell">
                       <span className="badge badge-info">{item.soldQuantity}</span>
                     </td>
                     <td className="table-cell font-semibold text-green-600">
-                      {state.settings.currency} {(item.revenue || 0).toFixed(2)}
+                      {state.settings.currency} {item.revenue.toFixed(2)}
                     </td>
                     <td className="table-cell">
                       <span className={`badge ${
@@ -1274,7 +1274,7 @@ export function ReportsManager() {
                         item.turnoverRatio > 0.2 ? 'badge-warning' :
                         'badge-error'
                       }`}>
-                        {((item.turnoverRatio * 100) || 0).toFixed(1)}%
+                        {(item.turnoverRatio * 100).toFixed(1)}%
                       </span>
                     </td>
                     <td className="table-cell">
@@ -1283,7 +1283,7 @@ export function ReportsManager() {
                         item.profitMargin > 20 ? 'text-orange-600' :
                         'text-red-600'
                       }`}>
-                        {(item.profitMargin || 0).toFixed(1)}%
+                        {item.profitMargin.toFixed(1)}%
                       </span>
                     </td>
                   </tr>
@@ -1341,15 +1341,15 @@ export function ReportsManager() {
                         <span className="badge badge-info">{product.quantitySold}</span>
                       </td>
                       <td className="table-cell font-semibold text-blue-600">
-                        {state.settings.currency} {(product.revenue || 0).toFixed(2)}
+                        {state.settings.currency} {product.revenue.toFixed(2)}
                       </td>
                       <td className="table-cell text-gray-600">
-                        {state.settings.currency} {(product.cogs || 0).toFixed(2)}
+                        {state.settings.currency} {product.cogs.toFixed(2)}
                       </td>
                       <td className={`table-cell font-semibold ${
                         product.grossProfit >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {state.settings.currency} {(product.grossProfit || 0).toFixed(2)}
+                        {state.settings.currency} {product.grossProfit.toFixed(2)}
                       </td>
                       <td className="table-cell">
                         <span className={`font-semibold ${
@@ -1358,7 +1358,7 @@ export function ReportsManager() {
                           product.margin > 0 ? 'text-yellow-600' :
                           'text-red-600'
                         }`}>
-                          {(product.margin || 0).toFixed(1)}%
+                          {product.margin.toFixed(1)}%
                         </span>
                       </td>
                     </tr>

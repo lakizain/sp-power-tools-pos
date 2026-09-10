@@ -2,30 +2,16 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { renderBarcodeToSvg } from '../../lib/barcodeUtils';
-import { X, Printer, Minus, Plus, FileText } from 'lucide-react';
-
-const PAGE_CONFIG = {
-  pageWidthMm: 210,
-  pageHeightMm: 297,
-  columns: 4,
-  rows: 8,
-  stickersPerPage: 32,
-
-  leftMarginMm: 5.0,
-  topMarginMm: 20.5,
-
-  stickerWidthMm: 38,
-  stickerHeightMm: 25,
-
-  horizontalPitchMm: 54.0,
-  verticalPitchMm: 32.7,
-} as const;
+import { X, Printer, Minus, Plus } from 'lucide-react';
 
 const STICKER_CONFIG = {
-  contentMarginLeftMm: 1.0,
-  contentMarginRightMm: 1.0,
-  contentMarginTopMm: 0.8,
-  contentMarginBottomMm: 0.8,
+  stickerWidthMm: 38,
+  stickerHeightMm: 25,
+  mediaWidthMm: 80,
+  marginLeftMm: 1.0,
+  marginRightMm: 1.0,
+  marginTopMm: 0.8,
+  marginBottomMm: 0.8,
 
   companyNameHeightMm: 2.0,
   productNameBaseHeightMm: 2.0,
@@ -46,25 +32,32 @@ const STICKER_CONFIG = {
   barcodeNumberFontSizePt: 9,
 } as const;
 
-interface StickerData {
-  companyName: string;
-  productName: string;
-  priceText: string;
-  barcodeValue: string;
-}
+const A4_GRID_CONFIG = {
+  pageWidthMm: 210,
+  pageHeightMm: 297,
+  columns: 4,
+  rows: 8,
+  marginXMm: 11,
+  marginYMm: 6.5,
+  horizontalGapMm: 12,
+  verticalGapMm: 12,
+  showBorder: true,
+} as const;
+
+type PrintMode = 'thermal' | 'a4grid';
 
 function mm(n: number): string {
   return `${n.toFixed(3)}mm`;
 }
 
-function calculateStickerLayout(productNameStr: string) {
+function calculateLayout(productNameStr: string) {
   const {
     stickerWidthMm,
     stickerHeightMm,
-    contentMarginLeftMm,
-    contentMarginRightMm,
-    contentMarginTopMm,
-    contentMarginBottomMm,
+    marginLeftMm,
+    marginRightMm,
+    marginTopMm,
+    marginBottomMm,
     companyNameHeightMm,
     productNameBaseHeightMm,
     productNameMaxLines,
@@ -76,8 +69,8 @@ function calculateStickerLayout(productNameStr: string) {
     barcodeMaxHeightMm,
   } = STICKER_CONFIG;
 
-  const contentWidthMm = stickerWidthMm - contentMarginLeftMm - contentMarginRightMm;
-  const contentHeightMm = stickerHeightMm - contentMarginTopMm - contentMarginBottomMm;
+  const contentWidthMm = stickerWidthMm - marginLeftMm - marginRightMm;
+  const contentHeightMm = stickerHeightMm - marginTopMm - marginBottomMm;
 
   const nameLength = productNameStr.length;
   let productNameLines = 1;
@@ -85,6 +78,7 @@ function calculateStickerLayout(productNameStr: string) {
   productNameLines = Math.min(productNameLines, productNameMaxLines);
 
   const productNameHeightMm = productNameBaseHeightMm * productNameLines;
+
   const fixedGaps = gapMm * 4;
 
   const fixedElementsHeightMm =
@@ -98,10 +92,10 @@ function calculateStickerLayout(productNameStr: string) {
   barcodeHeightMm = Math.max(barcodeHeightMm, barcodeMinHeightMm);
   barcodeHeightMm = Math.min(barcodeHeightMm, barcodeMaxHeightMm);
 
-  let yCursor = contentMarginTopMm;
+  let yCursor = marginTopMm;
 
   const companyName = {
-    x: contentMarginLeftMm,
+    x: marginLeftMm,
     y: yCursor,
     width: contentWidthMm,
     height: companyNameHeightMm,
@@ -109,7 +103,7 @@ function calculateStickerLayout(productNameStr: string) {
   yCursor += companyNameHeightMm + gapMm;
 
   const productName = {
-    x: contentMarginLeftMm,
+    x: marginLeftMm,
     y: yCursor,
     width: contentWidthMm,
     height: productNameHeightMm,
@@ -118,14 +112,14 @@ function calculateStickerLayout(productNameStr: string) {
   yCursor += productNameHeightMm + gapMm;
 
   const price = {
-    x: contentMarginLeftMm,
+    x: marginLeftMm,
     y: yCursor,
     width: contentWidthMm,
     height: priceHeightMm,
   };
   yCursor += priceHeightMm + gapMm;
 
-  const barcodeX = contentMarginLeftMm + (contentWidthMm - barcodeWidthMm) / 2;
+  const barcodeX = marginLeftMm + (contentWidthMm - barcodeWidthMm) / 2;
   const barcode = {
     x: barcodeX,
     y: yCursor,
@@ -135,7 +129,7 @@ function calculateStickerLayout(productNameStr: string) {
   yCursor += barcodeHeightMm + gapMm;
 
   const barcodeNumber = {
-    x: contentMarginLeftMm,
+    x: marginLeftMm,
     y: yCursor,
     width: contentWidthMm,
     height: barcodeNumberHeightMm,
@@ -155,21 +149,22 @@ function calculateStickerLayout(productNameStr: string) {
 }
 
 function getGridPosition(
-  stickerIndex: number,
-): { pageIndex: number; column: number; row: number; xMm: number; yMm: number } {
-  const { stickersPerPage, columns, rows, leftMarginMm, topMarginMm, horizontalPitchMm, verticalPitchMm } =
-    PAGE_CONFIG;
+  stickerIndex: number
+): { page: number; row: number; col: number; xMm: number; yMm: number } {
+  const { columns, rows, marginXMm, marginYMm, horizontalGapMm, verticalGapMm } =
+    A4_GRID_CONFIG;
+  const { stickerWidthMm, stickerHeightMm } = STICKER_CONFIG;
+  const stickersPerPage = columns * rows;
 
-  const pageIndex = Math.floor(stickerIndex / stickersPerPage);
-  const indexInPage = stickerIndex % stickersPerPage;
+  const page = Math.floor(stickerIndex / stickersPerPage);
+  const indexOnPage = stickerIndex % stickersPerPage;
+  const row = Math.floor(indexOnPage / columns);
+  const col = indexOnPage % columns;
 
-  const column = Math.floor(indexInPage / rows);
-  const row = indexInPage % rows;
+  const xMm = marginXMm + col * (stickerWidthMm + horizontalGapMm);
+  const yMm = marginYMm + row * (stickerHeightMm + verticalGapMm);
 
-  const xMm = leftMarginMm + column * horizontalPitchMm;
-  const yMm = topMarginMm + row * verticalPitchMm;
-
-  return { pageIndex, column, row, xMm, yMm };
+  return { page, row, col, xMm, yMm };
 }
 
 export interface BarcodeStickerPrintProps {
@@ -180,7 +175,8 @@ export interface BarcodeStickerPrintProps {
 
 export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
   const { state } = useApp();
-  const [copies, setCopies] = useState(32);
+  const [copies, setCopies] = useState(1);
+  const [mode, setMode] = useState<PrintMode>('thermal');
 
   const companyName = state.settings.storeName || '';
   const productName = product?.name || '';
@@ -188,51 +184,23 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   const barcodeValue = product?.barcode || '';
   const currency = state.settings.currency || 'Rs.';
 
-  const layout = calculateStickerLayout(productName);
+  const layout = useMemo(() => calculateLayout(productName), [productName]);
 
-  const priceFontSize = (layout.price.height / 3.0) * STICKER_CONFIG.priceFontSizePt;
-  const productNameFontSize =
-    layout.productName.lines >= 2 || productName.length > 22
-      ? STICKER_CONFIG.productNameFontSizeSmallPt
-      : STICKER_CONFIG.productNameFontSizePt;
+  const priceFontSize = layout.price.height / 3.6 * STICKER_CONFIG.priceFontSizePt;
+  const productNameFontSize = layout.productName.lines >= 2 || productName.length > 22
+    ? STICKER_CONFIG.productNameFontSizeSmallPt
+    : STICKER_CONFIG.productNameFontSizePt;
 
-  const stickerData: StickerData = {
-    companyName,
-    productName,
-    priceText: formatPriceStatic(priceValue, currency),
-    barcodeValue,
-  };
-
-  const pages = useMemo(() => {
-    const { stickersPerPage } = PAGE_CONFIG;
-    const pageCount = Math.max(1, Math.ceil(copies / stickersPerPage));
-    const result: StickerData[][][] = [];
-
-    for (let p = 0; p < pageCount; p++) {
-      const rowsArr: StickerData[][] = [];
-      for (let r = 0; r < PAGE_CONFIG.rows; r++) {
-        const rowCells: StickerData[] = [];
-        for (let c = 0; c < PAGE_CONFIG.columns; c++) {
-          const globalIndex = p * stickersPerPage + c * PAGE_CONFIG.rows + r;
-          if (globalIndex < copies && barcodeValue) {
-            rowCells.push(stickerData);
-          } else {
-            rowCells.push(null as unknown as StickerData);
-          }
-        }
-        rowsArr.push(rowCells);
-      }
-      result.push(rowsArr);
-    }
-    return result;
-  }, [copies, barcodeValue, stickerData]);
+  const stickersPerPage = A4_GRID_CONFIG.columns * A4_GRID_CONFIG.rows;
+  const totalPages =
+    mode === 'a4grid' ? Math.ceil(copies / stickersPerPage) : copies;
 
   const handlePrint = () => {
     setTimeout(() => {
-      const sheetRoot = document.getElementById('barcode-sticker-sheet');
-      if (!sheetRoot) return;
+      const stickerEl = document.getElementById('barcode-sticker-sheet');
+      if (!stickerEl) return;
 
-      const clone = sheetRoot.cloneNode(true) as HTMLElement;
+      const clone = stickerEl.cloneNode(true) as HTMLElement;
       clone.id = 'barcode-sticker-print-root';
       clone.style.position = 'absolute';
       clone.style.left = '0';
@@ -241,13 +209,13 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
       clone.style.background = '#ffffff';
       clone.style.display = 'block';
       clone.style.visibility = 'visible';
-      clone.style.width = mm(PAGE_CONFIG.pageWidthMm);
 
       const bodyChildren = Array.from(document.body.children) as HTMLElement[];
       bodyChildren.forEach((c) => c.classList.add('print-body-hidden'));
 
       document.body.appendChild(clone);
       clone.classList.add('print-body-visible');
+      clone.setAttribute('data-print-mode', mode);
 
       window.print();
 
@@ -255,19 +223,182 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         clone.remove();
         bodyChildren.forEach((c) => c.classList.remove('print-body-hidden'));
       }, 300);
-    }, 200);
+    }, 120);
+  };
+
+  const formatPrice = (n: number) => {
+    return `${currency}. ${n.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   };
 
   if (!isOpen || !product) return null;
 
-  const { stickerWidthMm, stickerHeightMm, companyName: cn, productName: pn, price: pr, barcode: bc, barcodeNumber: bn } =
-    layout;
+  const {
+    stickerWidthMm,
+    stickerHeightMm,
+    companyName: cn,
+    productName: pn,
+    price: pr,
+    barcode: bc,
+    barcodeNumber: bn,
+  } = layout;
+
+  const stickerContentProps = {
+    companyName,
+    productName,
+    priceText: formatPrice(priceValue),
+    barcodeValue,
+    barcodeNumberFontSize: STICKER_CONFIG.barcodeNumberFontSizePt,
+    companyNameFontSize: STICKER_CONFIG.companyNameFontSizePt,
+    productNameFontSize,
+    priceFontSize,
+    cn,
+    pn,
+    pr,
+    bc,
+    bn,
+    showBorder: mode === 'a4grid' && A4_GRID_CONFIG.showBorder,
+  };
+
+  const renderThermalSheet = () =>
+    Array.from({ length: copies }).map((_, i) => (
+      <div
+        key={`thermal-${i}`}
+        style={{
+          width: mm(stickerWidthMm),
+          height: mm(stickerHeightMm),
+          position: 'relative',
+          pageBreakAfter: i < copies - 1 ? 'always' : 'auto',
+          overflow: 'hidden',
+          background: '#ffffff',
+        }}
+      >
+        <StickerContent key={`s-${i}`} {...stickerContentProps} stickerKey={`t-${i}`} />
+      </div>
+    ));
+
+  const renderA4GridSheet = () => {
+    const pages: JSX.Element[] = [];
+    for (let p = 0; p < totalPages; p++) {
+      const startIdx = p * stickersPerPage;
+      const endIdx = Math.min(startIdx + stickersPerPage, copies);
+      const stickersOnPage: JSX.Element[] = [];
+
+      for (let s = startIdx; s < endIdx; s++) {
+        const { xMm, yMm } = getGridPosition(s);
+        stickersOnPage.push(
+          <div
+            key={`sticker-${s}`}
+            style={{
+              position: 'absolute',
+              left: mm(xMm),
+              top: mm(yMm),
+              width: mm(stickerWidthMm),
+              height: mm(stickerHeightMm),
+              overflow: 'hidden',
+              background: '#ffffff',
+              border: A4_GRID_CONFIG.showBorder ? '0.2mm solid #d1d5db' : 'none',
+              boxSizing: 'border-box',
+            }}
+          >
+            <StickerContent {...stickerContentProps} stickerKey={`a4-${s}`} showBorder={false} />
+          </div>
+        );
+      }
+
+      pages.push(
+        <div
+          key={`page-${p}`}
+          style={{
+            width: mm(A4_GRID_CONFIG.pageWidthMm),
+            height: mm(A4_GRID_CONFIG.pageHeightMm),
+            position: 'relative',
+            pageBreakAfter: p < totalPages - 1 ? 'always' : 'auto',
+            overflow: 'hidden',
+            background: '#ffffff',
+            boxSizing: 'border-box',
+          }}
+        >
+          {stickersOnPage}
+        </div>
+      );
+    }
+    return pages;
+  };
+
+  const renderPreview = () => {
+    if (mode === 'thermal') {
+      return (
+        <div
+          style={{
+            width: `${stickerWidthMm * 3.7795275591}px`,
+            height: `${stickerHeightMm * 3.7795275591}px`,
+            border: '1px dashed #9ca3af',
+            position: 'relative',
+            background: '#ffffff',
+            flexShrink: 0,
+          }}
+        >
+          <StickerContent {...stickerContentProps} stickerKey="pv-thermal" />
+        </div>
+      );
+    }
+
+    const previewScale = 2.2;
+    const pageW = A4_GRID_CONFIG.pageWidthMm * previewScale;
+    const pageH = A4_GRID_CONFIG.pageHeightMm * previewScale;
+    const firstPageStickers = Math.min(copies, stickersPerPage);
+    const previewStickers: JSX.Element[] = [];
+
+    for (let s = 0; s < firstPageStickers; s++) {
+      const { xMm, yMm } = getGridPosition(s);
+      previewStickers.push(
+        <div
+          key={`pv-${s}`}
+          style={{
+            position: 'absolute',
+            left: `${xMm * previewScale}px`,
+            top: `${yMm * previewScale}px`,
+            width: `${stickerWidthMm * previewScale}px`,
+            height: `${stickerHeightMm * previewScale}px`,
+            border: A4_GRID_CONFIG.showBorder ? '0.5px solid #d1d5db' : '1px dashed #9ca3af',
+            background: '#ffffff',
+            boxSizing: 'border-box',
+            transform: `scale(1)`,
+            transformOrigin: 'top left',
+          }}
+        >
+          <div style={{ transform: `scale(${previewScale / 3.7795275591})`, transformOrigin: 'top left', width: `${stickerWidthMm * 3.7795275591}px`, height: `${stickerHeightMm * 3.7795275591}px`, position: 'relative' }}>
+            <StickerContent {...stickerContentProps} stickerKey={`pv-s-${s}`} showBorder={false} />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        style={{
+          width: `${pageW}px`,
+          height: `${pageH}px`,
+          position: 'relative',
+          background: '#ffffff',
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          flexShrink: 0,
+        }}
+      >
+        {previewStickers}
+      </div>
+    );
+  };
 
   return (
     <div className="modal-overlay">
-      <div className="modal max-w-2xl">
+      <div className="modal max-w-3xl">
         <div className="modal-header no-print">
-          <h2 className="text-xl font-bold text-gray-900">Print Barcode Stickers</h2>
+          <h2 className="text-xl font-bold text-gray-900">Print Barcode Sticker</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100"
@@ -277,15 +408,13 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         </div>
 
         <div className="modal-body space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
+          <div className="no-print grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Product</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Sticker Info</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Name:</span>
-                  <span className="font-medium text-gray-900 text-right max-w-[55%] truncate">
-                    {productName}
-                  </span>
+                  <span className="text-gray-500">Product:</span>
+                  <span className="font-medium text-gray-900">{productName}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">SKU:</span>
@@ -293,167 +422,108 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Barcode:</span>
-                  <span className="font-mono text-gray-900">{barcodeValue || '—'}</span>
+                  <span className="font-mono text-gray-900">{barcodeValue}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Price:</span>
-                  <span className="font-semibold text-gray-900">{stickerData.priceText}</span>
+                  <span className="font-semibold text-gray-900">{formatPrice(priceValue)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Page Layout</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Format:</span>
-                  <span className="font-medium text-gray-900">A4 (210 × 297 mm)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Grid:</span>
-                  <span className="font-medium text-gray-900">
-                    {PAGE_CONFIG.columns} × {PAGE_CONFIG.rows} = {PAGE_CONFIG.stickersPerPage} / page
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Sticker:</span>
-                  <span className="font-medium text-gray-900">
-                    {stickerWidthMm} × {stickerHeightMm} mm
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Pitch (H×V):</span>
-                  <span className="font-medium text-gray-900">
-                    {PAGE_CONFIG.horizontalPitchMm} × {PAGE_CONFIG.verticalPitchMm} mm
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Order:</span>
-                  <span className="badge badge-info">Column-first (↓ then →)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="no-print">
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Stickers</label>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => setCopies((c) => Math.max(1, c - 1))}
-                className="btn btn-secondary btn-md"
-                disabled={copies <= 1}
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="text-2xl font-bold text-gray-900 w-20 text-center tabular-nums">
-                {copies}
-              </span>
-              <button
-                onClick={() => setCopies((c) => Math.min(320, c + 1))}
-                className="btn btn-secondary btn-md"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-              <div className="flex flex-wrap gap-2 ml-2">
-                {[8, 16, 32, 64].map((n) => (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Print Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    key={n}
-                    onClick={() => setCopies(n)}
-                    className={`px-3 py-2 text-xs font-semibold rounded-xl transition-colors ${
-                      copies === n
-                        ? 'bg-primary-500 text-white shadow-medium'
-                        : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                    onClick={() => setMode('thermal')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium border-2 transition ${
+                      mode === 'thermal'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    {n}
+                    🖨️ Thermal Roll
+                    <div className="text-xs font-normal mt-0.5 opacity-80">
+                      38×25mm · Xprinter
+                    </div>
                   </button>
-                ))}
+                  <button
+                    onClick={() => setMode('a4grid')}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium border-2 transition ${
+                      mode === 'a4grid'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    📄 A4 Sheet Grid
+                    <div className="text-xs font-normal mt-0.5 opacity-80">
+                      4×8 = {stickersPerPage}/page
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Number of Stickers
+                </label>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setCopies((c) => Math.max(1, c - 1))}
+                    className="btn btn-secondary btn-md"
+                    disabled={copies <= 1}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="text-lg font-bold text-gray-900 w-16 text-center">
+                    {copies}
+                  </span>
+                  <button
+                    onClick={() => setCopies((c) => Math.min(500, c + 1))}
+                    className="btn btn-secondary btn-md"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setCopies(32)}
+                    className="btn btn-secondary btn-sm text-xs"
+                  >
+                    32
+                  </button>
+                  <button
+                    onClick={() => setCopies(stickersPerPage)}
+                    className="btn btn-secondary btn-sm text-xs"
+                  >
+                    Full Sheet
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {mode === 'thermal'
+                    ? `Sticker: ${stickerWidthMm}×${stickerHeightMm}mm · Left-aligned on 80mm media`
+                    : `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Gaps: ${A4_GRID_CONFIG.horizontalGapMm}/${A4_GRID_CONFIG.verticalGapMm}mm`}
+                  {mode === 'a4grid' && copies > 0 && (
+                    <span className="ml-2 font-medium">
+                      · Pages: {totalPages}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2 flex items-center gap-2">
-              <FileText className="h-3.5 w-3.5" />
-              {pages.length} {pages.length === 1 ? 'page' : 'pages'} • fills columns top → bottom then left → right
-            </p>
           </div>
 
           <div className="no-print">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Single Sticker Preview</h3>
-            <div className="flex justify-center p-6 bg-gray-100 rounded-2xl border border-gray-200">
-              <div
-                style={{
-                  width: `${stickerWidthMm * 3.7795275591}px`,
-                  height: `${stickerHeightMm * 3.7795275591}px`,
-                  border: '1px dashed #9ca3af',
-                  position: 'relative',
-                  background: '#ffffff',
-                  flexShrink: 0,
-                }}
-              >
-                {barcodeValue ? (
-                  <StickerContent
-                    data={stickerData}
-                    companyNameFontSize={STICKER_CONFIG.companyNameFontSizePt}
-                    productNameFontSize={productNameFontSize}
-                    priceFontSize={priceFontSize}
-                    barcodeNumberFontSize={STICKER_CONFIG.barcodeNumberFontSizePt}
-                    cn={cn}
-                    pn={pn}
-                    pr={pr}
-                    bc={bc}
-                    bn={bn}
-                    instanceKey="preview"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-xs text-red-500 text-center p-4">
-                    No barcode. Edit the product to generate a barcode first.
-                  </div>
-                )}
-              </div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Preview</h3>
+            <div className="flex justify-center p-6 bg-gray-100 rounded-2xl border border-gray-200 overflow-auto">
+              {renderPreview()}
             </div>
           </div>
         </div>
 
         <div id="barcode-sticker-sheet" style={{ display: 'none' }}>
-          {pages.map((pageRows, pageIdx) => (
-            <A4Page key={`page-${pageIdx}`} isLast={pageIdx === pages.length - 1}>
-              {pageRows.map((rowCells, rIdx) =>
-                rowCells.map((cell, cIdx) => {
-                  if (!cell || !cell.barcodeValue) return null;
-                  const { xMm, yMm } = getGridPosition(
-                    pageIdx * PAGE_CONFIG.stickersPerPage + cIdx * PAGE_CONFIG.rows + rIdx,
-                  );
-                  return (
-                    <div
-                      key={`p${pageIdx}-r${rIdx}-c${cIdx}`}
-                      style={{
-                        position: 'absolute',
-                        left: mm(xMm),
-                        top: mm(yMm),
-                        width: mm(stickerWidthMm),
-                        height: mm(stickerHeightMm),
-                        overflow: 'hidden',
-                        background: '#ffffff',
-                      }}
-                    >
-                      <StickerContent
-                        data={cell}
-                        companyNameFontSize={STICKER_CONFIG.companyNameFontSizePt}
-                        productNameFontSize={productNameFontSize}
-                        priceFontSize={priceFontSize}
-                        barcodeNumberFontSize={STICKER_CONFIG.barcodeNumberFontSizePt}
-                        cn={cn}
-                        pn={pn}
-                        pr={pr}
-                        bc={bc}
-                        bn={bn}
-                        instanceKey={`p${pageIdx}-r${rIdx}-c${cIdx}-${cell.barcodeValue}`}
-                      />
-                    </div>
-                  );
-                }),
-              )}
-            </A4Page>
-          ))}
+          {mode === 'thermal' ? renderThermalSheet() : renderA4GridSheet()}
         </div>
 
         <div className="modal-footer no-print">
@@ -466,28 +536,23 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             disabled={!barcodeValue}
           >
             <Printer className="h-4 w-4 mr-2" />
-            Print {copies} Sticker{copies === 1 ? '' : 's'}
+            Print {copies > 1 ? `${copies} Stickers` : 'Sticker'}
+            {mode === 'a4grid' && totalPages > 1 && ` · ${totalPages} Pages`}
           </button>
         </div>
 
         <style>{`
           @media print {
             @page {
-              size: A4;
               margin: 0mm;
             }
 
             html, body {
               margin: 0 !important;
               padding: 0 !important;
-              width: ${PAGE_CONFIG.pageWidthMm}mm !important;
               background: #ffffff !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
-            }
-
-            body {
-              height: auto !important;
             }
 
             .no-print { display: none !important; }
@@ -500,6 +565,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             #barcode-sticker-print-root,
             #barcode-sticker-print-root * {
               visibility: visible !important;
+              display: block !important;
             }
 
             #barcode-sticker-print-root {
@@ -508,23 +574,28 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
               top: 0 !important;
               margin: 0 !important;
               padding: 0 !important;
-              width: ${PAGE_CONFIG.pageWidthMm}mm !important;
             }
 
-            .a4-page {
-              width: ${PAGE_CONFIG.pageWidthMm}mm !important;
-              height: ${PAGE_CONFIG.pageHeightMm}mm !important;
-              position: relative !important;
-              overflow: hidden !important;
-              page-break-after: always !important;
-              page-break-inside: avoid !important;
+            #barcode-sticker-print-root > div {
               margin: 0 !important;
               padding: 0 !important;
-              background: #ffffff !important;
+              box-sizing: border-box !important;
             }
 
-            .a4-page:last-of-type {
-              page-break-after: auto !important;
+            #barcode-sticker-print-root[data-print-mode="thermal"] {
+              width: ${STICKER_CONFIG.stickerWidthMm}mm !important;
+            }
+
+            #barcode-sticker-print-root[data-print-mode="thermal"] @page {
+              size: ${STICKER_CONFIG.stickerWidthMm}mm ${STICKER_CONFIG.stickerHeightMm}mm;
+            }
+
+            #barcode-sticker-print-root[data-print-mode="a4grid"] {
+              width: ${A4_GRID_CONFIG.pageWidthMm}mm !important;
+            }
+
+            #barcode-sticker-print-root[data-print-mode="a4grid"] @page {
+              size: A4 portrait;
             }
           }
         `}</style>
@@ -533,33 +604,11 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   );
 }
 
-function formatPriceStatic(n: number, currency: string): string {
-  return `${currency}. ${n.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function A4Page({ children, isLast }: { children: React.ReactNode; isLast?: boolean }) {
-  return (
-    <div
-      className="a4-page"
-      style={{
-        width: mm(PAGE_CONFIG.pageWidthMm),
-        height: mm(PAGE_CONFIG.pageHeightMm),
-        position: 'relative',
-        overflow: 'hidden',
-        background: '#ffffff',
-        pageBreakAfter: isLast ? 'auto' : 'always',
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 interface StickerContentProps {
-  data: StickerData;
+  companyName: string;
+  productName: string;
+  priceText: string;
+  barcodeValue: string;
   companyNameFontSize: number;
   productNameFontSize: number;
   priceFontSize: number;
@@ -569,11 +618,15 @@ interface StickerContentProps {
   pr: { x: number; y: number; width: number; height: number };
   bc: { x: number; y: number; width: number; height: number };
   bn: { x: number; y: number; width: number; height: number };
-  instanceKey: string;
+  stickerKey: string;
+  showBorder?: boolean;
 }
 
 function StickerContent({
-  data,
+  companyName,
+  productName,
+  priceText,
+  barcodeValue,
   companyNameFontSize,
   productNameFontSize,
   priceFontSize,
@@ -583,14 +636,15 @@ function StickerContent({
   pr,
   bc,
   bn,
-  instanceKey,
+  stickerKey,
+  showBorder = false,
 }: StickerContentProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const depKey = `${instanceKey}-${data.barcodeValue}-${bc.width}-${bc.height}`;
+  const inlineBarcodeSvgRef = useRef<SVGSVGElement>(null);
+  const key = `${stickerKey}-${barcodeValue}-${bc.width}-${bc.height}`;
 
   useEffect(() => {
-    if (!svgRef.current || !data.barcodeValue) return;
-    const svg = svgRef.current;
+    if (!inlineBarcodeSvgRef.current || !barcodeValue) return;
+    const svg = inlineBarcodeSvgRef.current;
     const widthPx = (bc.width / 25.4) * 96;
     const heightPx = (bc.height / 25.4) * 96;
     svg.setAttribute('width', '100%');
@@ -599,7 +653,7 @@ function StickerContent({
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.innerHTML = '';
     try {
-      renderBarcodeToSvg(svg, data.barcodeValue, {
+      renderBarcodeToSvg(svg, barcodeValue, {
         format: 'CODE128',
         width: Math.max(1, Math.floor(widthPx / 60)),
         height: heightPx,
@@ -615,7 +669,7 @@ function StickerContent({
     } catch (e) {
       console.error(e);
     }
-  }, [depKey, data.barcodeValue, bc.width, bc.height]);
+  }, [key, barcodeValue, bc.width, bc.height]);
 
   return (
     <div
@@ -629,6 +683,8 @@ function StickerContent({
         background: '#ffffff',
         fontFamily: "'Inter', Arial, Helvetica, sans-serif",
         color: '#000000',
+        border: showBorder ? '0.1mm solid #9ca3af' : 'none',
+        boxSizing: 'border-box',
       }}
     >
       <div
@@ -651,7 +707,7 @@ function StickerContent({
           textOverflow: 'ellipsis',
         }}
       >
-        {data.companyName}
+        {companyName}
       </div>
 
       <div
@@ -673,7 +729,7 @@ function StickerContent({
           hyphens: 'auto',
         }}
       >
-        {data.productName}
+        {productName}
       </div>
 
       <div
@@ -695,7 +751,7 @@ function StickerContent({
           whiteSpace: 'nowrap',
         }}
       >
-        {data.priceText}
+        {priceText}
       </div>
 
       <div
@@ -709,8 +765,12 @@ function StickerContent({
         }}
       >
         <svg
-          ref={svgRef}
-          style={{ width: '100%', height: '100%', display: 'block' }}
+          ref={inlineBarcodeSvgRef}
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'block',
+          }}
         />
       </div>
 
@@ -734,7 +794,7 @@ function StickerContent({
           whiteSpace: 'nowrap',
         }}
       >
-        {data.barcodeValue}
+        {barcodeValue}
       </div>
     </div>
   );

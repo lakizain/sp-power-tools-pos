@@ -166,7 +166,7 @@ export function InventoryManager() {
           <div className="flex items-center justify-between relative z-10">
             <div>
               <p className="text-green-100 text-sm font-medium">Inventory Value</p>
-              <p className="text-xl lg:text-2xl font-bold">$ {(totalValue || 0).toFixed(2)}</p>
+              <p className="text-xl lg:text-2xl font-bold">$ {totalValue.toFixed(2)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl">
               <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -271,10 +271,10 @@ export function InventoryManager() {
                       <span className="badge badge-info">{product.category}</span>
                     </td>
                     <td className="table-cell font-semibold">
-                      $ {(product.price || 0).toFixed(2)}
+                      $ {product.price.toFixed(2)}
                     </td>
                     <td className="table-cell text-gray-600">
-                      $ {(product.cost || 0).toFixed(2)}
+                      $ {product.cost.toFixed(2)}
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center space-x-2">

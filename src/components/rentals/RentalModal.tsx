@@ -96,11 +96,11 @@ export function RentalModal({ isOpen, onClose, onSave, editingRental }: RentalMo
     const balance = Math.max(0, rentTotal - paidAmount);
 
     return {
-      rentTotal: Number(((rentTotal) || 0).toFixed(2)),
-      itemsSubtotal: Number(((itemsSubtotal) || 0).toFixed(2)),
+      rentTotal: Number(rentTotal.toFixed(2)),
+      itemsSubtotal: Number(itemsSubtotal.toFixed(2)),
       securityDeposit,
       paidAmount,
-      balance: Number(((balance) || 0).toFixed(2)),
+      balance: Number(balance.toFixed(2)),
     };
   }, [items, formData.dailyRate, formData.weeklyRate, formData.securityDeposit, formData.paidAmount, daysRented]);
 
@@ -132,7 +132,7 @@ export function RentalModal({ isOpen, onClose, onSave, editingRental }: RentalMo
       productName: defaultProduct.name,
       sku: defaultProduct.sku,
       quantity: 1,
-      dailyRate: Number(((defaultProduct.price * 0.1) || 0).toFixed(2)),
+      dailyRate: Number((defaultProduct.price * 0.1).toFixed(2)),
       subtotal: 0,
       condition: 'new',
       notes: '',
@@ -153,7 +153,7 @@ export function RentalModal({ isOpen, onClose, onSave, editingRental }: RentalMo
     if (field === 'quantity' || field === 'dailyRate') {
       const qty = Number(updated[index].quantity) || 0;
       const rate = Number(updated[index].dailyRate) || 0;
-      updated[index].subtotal = Number(((qty * rate * daysRented) || 0).toFixed(2));
+      updated[index].subtotal = Number((qty * rate * daysRented).toFixed(2));
     }
     setItems(updated);
   };
@@ -189,7 +189,7 @@ export function RentalModal({ isOpen, onClose, onSave, editingRental }: RentalMo
         ...i,
         quantity: qty,
         dailyRate: rate,
-        subtotal: Number(((qty * rate * daysRented) || 0).toFixed(2)),
+        subtotal: Number((qty * rate * daysRented).toFixed(2)),
       };
     });
 
@@ -468,7 +468,7 @@ export function RentalModal({ isOpen, onClose, onSave, editingRental }: RentalMo
                       <div className="md:col-span-1 flex flex-col justify-end">
                         <div className="text-[10px] font-bold text-gray-600 uppercase mb-1">Subtotal</div>
                         <div className="text-xs font-black text-violet-700 bg-white px-2 py-2.5 rounded-lg border border-gray-200 text-center">
-                          {state.settings.currency} {((item.quantity * item.dailyRate * daysRented) || 0).toFixed(2)}
+                          {state.settings.currency} {(item.quantity * item.dailyRate * daysRented).toFixed(2)}
                         </div>
                       </div>
                       <div className="md:col-span-1 flex items-end">
@@ -518,25 +518,25 @@ export function RentalModal({ isOpen, onClose, onSave, editingRental }: RentalMo
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="bg-white/15 rounded-xl p-3 backdrop-blur-sm">
                 <div className="text-violet-100 text-xs font-semibold">Total Rent</div>
-                <div className="text-2xl font-black mt-1">{state.settings.currency} {(totals.rentTotal || 0).toFixed(2)}</div>
+                <div className="text-2xl font-black mt-1">{state.settings.currency} {totals.rentTotal.toFixed(2)}</div>
               </div>
               <div className="bg-white/15 rounded-xl p-3 backdrop-blur-sm">
                 <div className="text-violet-100 text-xs font-semibold">Security Deposit</div>
-                <div className="text-2xl font-black mt-1">{state.settings.currency} {(totals.securityDeposit || 0).toFixed(2)}</div>
+                <div className="text-2xl font-black mt-1">{state.settings.currency} {totals.securityDeposit.toFixed(2)}</div>
               </div>
               <div className="bg-emerald-400/25 rounded-xl p-3 backdrop-blur-sm border border-emerald-300/30">
                 <div className="text-emerald-50 text-xs font-semibold">Paid Amount</div>
-                <div className="text-2xl font-black mt-1 text-emerald-50">{state.settings.currency} {(totals.paidAmount || 0).toFixed(2)}</div>
+                <div className="text-2xl font-black mt-1 text-emerald-50">{state.settings.currency} {totals.paidAmount.toFixed(2)}</div>
               </div>
               <div className="bg-rose-400/25 rounded-xl p-3 backdrop-blur-sm border border-rose-300/30">
                 <div className="text-rose-50 text-xs font-semibold">Balance Due</div>
-                <div className="text-2xl font-black mt-1 text-rose-50">{state.settings.currency} {(totals.balance || 0).toFixed(2)}</div>
+                <div className="text-2xl font-black mt-1 text-rose-50">{state.settings.currency} {totals.balance.toFixed(2)}</div>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-white/20 text-xs text-violet-100 font-semibold flex items-center justify-between">
               <span>Grand Total (Rent + Deposit):</span>
               <span className="text-white text-lg font-black">
-                {state.settings.currency} {((totals.rentTotal + totals.securityDeposit) || 0).toFixed(2)}
+                {state.settings.currency} {(totals.rentTotal + totals.securityDeposit).toFixed(2)}
               </span>
             </div>
           </div>

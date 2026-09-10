@@ -28,7 +28,7 @@ export function PaymentModal({ isOpen, onClose, onSave, outstanding }: PaymentMo
     if (outstanding && isOpen) {
       const amount = outstanding.outstandingAmount;
       setFormData({
-        amount: amount > 0 ? (amount || 0).toFixed(2) : '',
+        amount: amount > 0 ? amount.toFixed(2) : '',
         method: 'cash',
         reference: '',
         date: new Date().toISOString().split('T')[0],
@@ -53,7 +53,7 @@ export function PaymentModal({ isOpen, onClose, onSave, outstanding }: PaymentMo
 
     const newErrors: Record<string, string> = {};
     if (!amount || amount <= 0) newErrors.amount = 'Please enter a valid payment amount';
-    if (amount > remaining + 0.001) newErrors.amount = `Payment cannot exceed outstanding balance of ${(remaining || 0).toFixed(2)}`;
+    if (amount > remaining + 0.001) newErrors.amount = `Payment cannot exceed outstanding balance of ${remaining.toFixed(2)}`;
     if (!formData.date) newErrors.date = 'Date is required';
 
     setErrors(newErrors);
@@ -108,15 +108,15 @@ export function PaymentModal({ isOpen, onClose, onSave, outstanding }: PaymentMo
           <div className="grid grid-cols-3 gap-3 mb-2">
             <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
               <div className="text-[10px] font-bold uppercase text-red-600">Total</div>
-              <div className="text-sm font-bold text-red-800 mt-0.5">{(outstanding.totalAmount || 0).toFixed(2)}</div>
+              <div className="text-sm font-bold text-red-800 mt-0.5">{outstanding.totalAmount.toFixed(2)}</div>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
               <div className="text-[10px] font-bold uppercase text-green-600">Paid</div>
-              <div className="text-sm font-bold text-green-800 mt-0.5">{(outstanding.paidAmount || 0).toFixed(2)}</div>
+              <div className="text-sm font-bold text-green-800 mt-0.5">{outstanding.paidAmount.toFixed(2)}</div>
             </div>
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-center">
               <div className="text-[10px] font-bold uppercase text-orange-600">O/S</div>
-              <div className="text-sm font-bold text-orange-800 mt-0.5">{(outstanding.outstandingAmount || 0).toFixed(2)}</div>
+              <div className="text-sm font-bold text-orange-800 mt-0.5">{outstanding.outstandingAmount.toFixed(2)}</div>
             </div>
           </div>
 
@@ -144,7 +144,7 @@ export function PaymentModal({ isOpen, onClose, onSave, outstanding }: PaymentMo
               {errors.amount && <p className="text-red-500 text-xs mt-1">{errors.amount}</p>}
               <div className="mt-2 flex flex-wrap gap-2">
                 {[0.25, 0.5, 0.75, 1].map(frac => {
-                  const amt = Number(((outstanding.outstandingAmount * frac) || 0).toFixed(2));
+                  const amt = Number((outstanding.outstandingAmount * frac).toFixed(2));
                   return (
                     <button
                       key={frac}
@@ -223,16 +223,16 @@ export function PaymentModal({ isOpen, onClose, onSave, outstanding }: PaymentMo
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Current outstanding:</span>
-              <span className="font-semibold">{(outstanding.outstandingAmount || 0).toFixed(2)}</span>
+              <span className="font-semibold">{outstanding.outstandingAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm mt-1">
               <span className="text-gray-600">This payment:</span>
-              <span className="font-semibold text-green-600">- {((Number(formData.amount || 0)) || 0).toFixed(2)}</span>
+              <span className="font-semibold text-green-600">- {Number(formData.amount || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between pt-2 mt-2 border-t border-blue-200/60 font-bold">
               <span>New balance after payment:</span>
               <span className={newBalance <= 0.01 ? 'text-green-600' : 'text-orange-600'}>
-                {(newBalance || 0).toFixed(2)}
+                {newBalance.toFixed(2)}
               </span>
             </div>
           </div>
