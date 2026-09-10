@@ -175,7 +175,7 @@ export interface BarcodeStickerPrintProps {
 
 export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
   const { state } = useApp();
-  const [copies, setCopies] = useState(32);
+  const [copies, setCopies] = useState(1);
   const [mode, setMode] = useState<PrintMode>('a4grid');
 
   const companyName = state.settings.storeName || '';
