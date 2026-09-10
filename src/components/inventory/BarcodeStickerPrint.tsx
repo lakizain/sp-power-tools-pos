@@ -88,21 +88,13 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
 
   useEffect(() => {
     if (!isOpen || !product) return;
-    const isRollMode = layoutMode === 'roll-35x25';
-    const h = isRollMode ? 22 : 34;
-    const fs = isRollMode ? 11 : 14;
-    const bw = isRollMode ? 2 : 2;
-    renderBarcodes(previewSvgs, h, fs, bw, true, 0, 3);
+    renderBarcodes(previewSvgs, 24, 16, 2.2, true, 0, 2);
   }, [isOpen, product?.id, product?.barcode, stickerCount, layoutMode]);
 
   if (!isOpen || !product) return null;
 
   const handlePrint = () => {
-    if (layoutMode === 'roll-35x25') {
-      renderBarcodes(printSvgs, 24, 12, 2, true, 0, 3);
-    } else {
-      renderBarcodes(printSvgs, 36, 15, 2, true, 0, 4);
-    }
+    renderBarcodes(printSvgs, 26, 18, 2.2, true, 0, 2);
 
     setTimeout(() => {
       const src = document.getElementById('sticker-print-area');
@@ -160,9 +152,19 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     : `${state.settings.currency}${product.price.toFixed(2)}`;
 
   const isRoll = layoutMode === 'roll-35x25';
-  const blockWmm = isRoll ? ROLL_BLOCK_W_MM : SHEET_BLOCK_W_MM;
+  const stickerWmm = isRoll ? ROLL_BLOCK_W_MM : SHEET_BLOCK_W_MM;
+  const stickerHmm = isRoll ? ROLL_BLOCK_H_MM : 28;
   const previewW = isRoll ? PREVIEW_W_ROLL : PREVIEW_W_SHEET;
   const previewH = isRoll ? PREVIEW_H_ROLL : PREVIEW_H_SHEET;
+
+  const COMMON_HEADER_FONT = '6pt';
+  const COMMON_PRODUCT_FONT = '11.5pt';
+  const COMMON_PRICE_FONT = '10.5pt';
+  const COMMON_SVG_HEIGHT_MM = '18mm';
+  const COMMON_PREVIEW_SVG_H = '52px';
+  const COMMON_PREVIEW_HEADER_FS = '6.5px';
+  const COMMON_PREVIEW_PRODUCT_FS = '13px';
+  const COMMON_PREVIEW_PRICE_FS = '12px';
 
   const StickerContent = ({
     svgRef,
@@ -171,105 +173,51 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     svgRef: (el: SVGSVGElement | null) => void;
     isPrint: boolean;
   }) => {
-    if (isRoll) {
-      return (
-        <div
-          className="flex flex-col items-start justify-between bg-white text-black"
-          style={{
-            width: isPrint ? `${blockWmm}mm` : `${previewW}px`,
-            height: isPrint ? `${ROLL_BLOCK_H_MM}mm` : `${previewH}px`,
-            padding: isPrint ? '0.2mm 0.3mm 0.2mm 0.3mm' : '0.5px 1px 0.5px 1px',
-            boxSizing: 'border-box',
-            overflow: 'visible',
-            fontFamily: 'Arial, sans-serif',
-            gap: isPrint ? '0.15mm' : '0.5px',
-          }}
-        >
+    const headerFs = isPrint ? COMMON_HEADER_FONT : COMMON_PREVIEW_HEADER_FS;
+    const productFs = isPrint ? COMMON_PRODUCT_FONT : COMMON_PREVIEW_PRODUCT_FS;
+    const priceFs = isPrint ? COMMON_PRICE_FONT : COMMON_PREVIEW_PRICE_FS;
+    const svgH = isPrint ? COMMON_SVG_HEIGHT_MM : COMMON_PREVIEW_SVG_H;
+    const padding = isPrint ? '0.2mm 0.4mm 0.2mm 0.4mm' : '1px';
+    const containerW = isPrint ? `${stickerWmm}mm` : `${previewW}px`;
+    const containerH = isPrint ? `${stickerHmm}mm` : `${previewH}px`;
+    const headerGap = isPrint ? '0.08mm' : '0.3px';
+    const priceMt = isPrint ? '0.08mm' : '0.3px';
+
+    return (
+      <div
+        className="flex flex-col items-center bg-white text-black"
+        style={{
+          width: containerW,
+          height: containerH,
+          padding,
+          boxSizing: 'border-box',
+          overflow: 'visible',
+          fontFamily: 'Arial, sans-serif',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: headerGap, width: '100%' }}>
           <div
-            className="text-center font-bold uppercase w-full truncate tracking-tighter"
-            style={{
-              fontSize: isPrint ? '5pt' : '5.5px',
-              letterSpacing: isPrint ? '-0.05mm' : '-0.1px',
-              lineHeight: 1,
-            }}
+            className="text-center font-bold uppercase w-full truncate tracking-tight"
+            style={{ fontSize: headerFs, letterSpacing: isPrint ? '-0.03mm' : '-0.05px', lineHeight: 1, margin: 0 }}
           >
             S&amp;P POWER TOOLS
           </div>
-
           <div
-            className="text-center font-semibold leading-tight w-full truncate"
+            className="text-center font-extrabold w-full overflow-hidden"
             style={{
-              fontSize: isPrint ? '5pt' : '5.5px',
-              lineHeight: 1,
+              fontSize: productFs,
+              lineHeight: 1.05,
+              fontWeight: 800,
+              margin: 0,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              lineClamp: 2,
             }}
           >
             {product.name}
           </div>
-
-          <svg
-            ref={svgRef}
-            xmlns="http://www.w3.org/2000/svg"
-            preserveAspectRatio="xMidYMid meet"
-            style={{
-              width: '100%',
-              maxWidth: '100%',
-              height: isPrint ? '16mm' : '44px',
-              display: 'block',
-              flex: '0 0 auto',
-              shapeRendering: 'crispEdges',
-              overflow: 'visible',
-            }}
-          />
-
-          <div
-            className="text-center font-semibold leading-none w-full"
-            style={{
-              fontSize: isPrint ? '5.5pt' : '6px',
-              lineHeight: 1,
-            }}
-          >
-            {priceText}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div
-        className="flex flex-col items-center justify-between bg-white text-black"
-        style={{
-          width: isPrint ? `${blockWmm}mm` : `${previewW}px`,
-          height: isPrint ? 'auto' : `${previewH}px`,
-          padding: isPrint ? '0.2mm 0.2mm 0.2mm 0.2mm' : '1px',
-          boxSizing: 'border-box',
-          overflow: 'visible',
-          fontFamily: 'Arial, sans-serif',
-          gap: isPrint ? '0.4mm' : '1px',
-        }}
-      >
-        <div
-          className="text-center font-bold uppercase w-full truncate tracking-tighter"
-          style={{
-            fontSize: isPrint ? '6pt' : '6px',
-            letterSpacing: isPrint ? '-0.05mm' : '-0.08px',
-            lineHeight: 1.05,
-          }}
-        >
-          S&amp;P POWER TOOLS
-        </div>
-
-        <div
-          className="text-center font-semibold leading-tight w-full overflow-hidden"
-          style={{
-            fontSize: isPrint ? '7pt' : '7px',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            lineClamp: 2,
-            lineHeight: 1.05,
-          }}
-        >
-          {product.name}
         </div>
 
         <svg
@@ -279,18 +227,22 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           style={{
             width: '100%',
             maxWidth: '100%',
-            height: isPrint ? '22mm' : '48px',
+            height: svgH,
             display: 'block',
             shapeRendering: 'crispEdges',
             overflow: 'visible',
+            margin: 0,
           }}
         />
 
         <div
-          className="text-center font-bold leading-none w-full"
+          className="text-center font-extrabold leading-none w-full"
           style={{
-            fontSize: isPrint ? '7.5pt' : '8px',
+            fontSize: priceFs,
             lineHeight: 1,
+            fontWeight: 800,
+            margin: 0,
+            marginTop: priceMt,
           }}
         >
           {priceText}
