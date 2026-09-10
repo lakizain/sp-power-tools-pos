@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Scale, ScanLine, Wand2, Printer } from 'lucide-react';
-import { Product, ProductBatch } from '../../types';
+import { X, Scale, ScanLine, Wand2, Printer, FolderPlus, RefreshCw } from 'lucide-react';
+import { Product, ProductBatch, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import Swal from 'sweetalert2';
 import { generateBarcodeNumber, generateSimpleBarcodeNumber, renderBarcodeToCanvas } from '../../lib/barcodeUtils';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
+import { CategoryModal } from './CategoryModal';
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ interface ProductModalProps {
 }
 
 export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
-  const { dispatch } = useApp();
+  const { dispatch, state } = useApp();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -38,11 +39,34 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   const [isScanningBarcode, setIsScanningBarcode] = useState(false);
   const [showStickerPrint, setShowStickerPrint] = useState(false);
   const [savedProductForSticker, setSavedProductForSticker] = useState<Product | null>(null);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const scanBufferRef = useRef<string>('');
   const lastScanKeyTimeRef = useRef<number>(0);
   const barcodePreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const stickerCountRef = useRef<number>(1);
+
+  const loadCategories = async () => {
+    try {
+      const { categoriesService } = await import('../../lib/services');
+      const cats = await categoriesService.getAll();
+      setCategories(cats);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      loadCategories();
+    }
+  }, [isOpen]);
+
+  const activeDbCategoryNames = categories.filter(c => c.active).map(c => c.name);
+  const productCategoryNames = Array.from(new Set(state.products.map((p: Product) => p.category)));
+  const mergedCategoryOptions = Array.from(new Set([...activeDbCategoryNames, ...productCategoryNames])).sort();
 
   useEffect(() => {
     if (product) {
@@ -65,6 +89,7 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
         trackInventory: product.trackInventory ?? true,
       });
       setBatches(product.batches || []);
+      setIsCustomCategory(!product.category || !mergedCategoryOptions.includes(product.category));
     } else {
       setFormData({
         name: '',
@@ -85,6 +110,7 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
         trackInventory: true,
       });
       setBatches([]);
+      setIsCustomCategory(false);
     }
   }, [product]);
 
@@ -424,15 +450,75 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Category *
                 </label>
-                <input
-                  type="text"
-                  name="category"
-                  value={formData.category}
-                  onChange={handleChange}
-                  required
-                  className="input"
-                  placeholder="Enter category"
-                />
+                <div className="space-y-2">
+                  {!isCustomCategory ? (
+                    <div className="flex gap-2">
+                      <select
+                        name="category"
+                        value={mergedCategoryOptions.includes(formData.category) ? formData.category : ''}
+                        onChange={(e) => {
+                          if (e.target.value === '__custom__') {
+                            setIsCustomCategory(true);
+                            setFormData(prev => ({ ...prev, category: '' }));
+                          } else {
+                            setFormData(prev => ({ ...prev, category: e.target.value }));
+                          }
+                        }}
+                        className="select flex-1"
+                        required
+                      >
+                        <option value="">Select category...</option>
+                        {mergedCategoryOptions.map(catName => (
+                          <option key={catName} value={catName}>{catName}</option>
+                        ))}
+                        <option value="__custom__">✏️ Type custom category...</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowCategoryModal(true)}
+                        className="btn btn-secondary px-3 flex items-center gap-1"
+                        title="Manage categories"
+                      >
+                        <FolderPlus className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={loadCategories}
+                        className="btn btn-secondary px-3"
+                        title="Refresh categories"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="category"
+                        value={formData.category}
+                        onChange={handleChange}
+                        required
+                        className="input flex-1"
+                        placeholder="Enter custom category name..."
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomCategory(false);
+                        }}
+                        className="btn btn-secondary whitespace-nowrap"
+                      >
+                        ← Pick from list
+                      </button>
+                    </div>
+                  )}
+                  {formData.category && !mergedCategoryOptions.includes(formData.category) && (
+                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                      ⚠️ This is a new custom category. It will be saved with the product but won't appear in category management until added explicitly.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -861,6 +947,14 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
           onClose();
         }}
         product={savedProductForSticker || (product as Product)}
+      />
+
+      <CategoryModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onCategoriesChanged={() => {
+          loadCategories();
+        }}
       />
     </div>
   );

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Printer } from 'lucide-react';
-import { Product } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Printer, FolderPlus } from 'lucide-react';
+import { Product, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { ProductModal } from './ProductModal';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
+import { CategoryModal } from './CategoryModal';
 import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 
@@ -17,8 +18,27 @@ export function InventoryManager() {
   const [stickerPrintProduct, setStickerPrintProduct] = useState<Product | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'price'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [dbCategories, setDbCategories] = useState<ProductCategory[]>([]);
 
-  const categories = ['All', ...Array.from(new Set(state.products.map((p: Product) => p.category)))];
+  const loadDbCategories = async () => {
+    try {
+      const { categoriesService } = await import('../../lib/services');
+      const cats = await categoriesService.getAll();
+      setDbCategories(cats);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadDbCategories();
+  }, []);
+
+  const activeDbCategoryNames = dbCategories.filter(c => c.active).map(c => c.name);
+  const productCategoryNames = Array.from(new Set(state.products.map((p: Product) => p.category)));
+  const allCategoryNames = Array.from(new Set([...activeDbCategoryNames, ...productCategoryNames])).sort();
+  const categories = ['All', ...allCategoryNames];
 
   const filteredProducts = (() => {
     const filtered = state.products
@@ -127,13 +147,22 @@ export function InventoryManager() {
           <p className="text-gray-600 mt-1">Manage your products and stock levels</p>
         </div>
         
-        <button
-          onClick={handleAddProduct}
-          className="btn btn-primary btn-lg"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Product</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="btn btn-secondary btn-lg"
+          >
+            <FolderPlus className="h-5 w-5" />
+            <span>Manage Categories</span>
+          </button>
+          <button
+            onClick={handleAddProduct}
+            className="btn btn-primary btn-lg"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Product</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -343,6 +372,14 @@ export function InventoryManager() {
           setStickerPrintProduct(null);
         }}
         product={stickerPrintProduct as Product}
+      />
+
+      <CategoryModal
+        isOpen={showCategoryModal}
+        onClose={() => setShowCategoryModal(false)}
+        onCategoriesChanged={() => {
+          loadDbCategories();
+        }}
       />
     </div>
   );

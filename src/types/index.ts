@@ -224,6 +224,15 @@ export interface Expense {
   attachments?: string[];
 }
 
+export interface ProductCategory {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ExpenseCategory {
   id: string;
   name: string;

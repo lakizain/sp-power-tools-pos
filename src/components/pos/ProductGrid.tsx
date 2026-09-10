@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, Plus, Package, Scale, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Product } from '../../types';
+import { Product, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { matchesAnyField } from '../../lib/searchUtils';
 
@@ -14,9 +14,24 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showWeightModal, setShowWeightModal] = useState<Product | null>(null);
   const [weight, setWeight] = useState('');
+  const [dbCategories, setDbCategories] = useState<ProductCategory[]>([]);
   const categoriesRef = useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = useState(false);
   const [showRightScroll, setShowRightScroll] = useState(false);
+
+  const loadDbCategories = async () => {
+    try {
+      const { categoriesService } = await import('../../lib/services');
+      const cats = await categoriesService.getAll();
+      setDbCategories(cats);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadDbCategories();
+  }, []);
 
   const filteredProducts = state.products.filter(product => {
     const matchesSearch = matchesAnyField(
@@ -33,7 +48,10 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
     return matchesSearch && matchesCategory && product.active;
   });
 
-  const categories = ['All', ...Array.from(new Set(state.products.map(p => p.category)))];
+  const activeDbCategoryNames = dbCategories.filter(c => c.active).map(c => c.name);
+  const productCategoryNames = Array.from(new Set(state.products.map(p => p.category)));
+  const allCategoryNames = Array.from(new Set([...activeDbCategoryNames, ...productCategoryNames])).sort();
+  const categories = ['All', ...allCategoryNames];
   const isTouchMode = state.settings.interfaceMode === 'touch';
 
   const checkScrollButtons = () => {

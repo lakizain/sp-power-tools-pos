@@ -20,7 +20,8 @@ import {
   ProductReturn,
   OutstandingPayment,
   Rental,
-  RentalItem
+  RentalItem,
+  ProductCategory
 } from '../types'
 
 // Products Service
@@ -1901,5 +1902,86 @@ export const rentalsService = {
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from('rentals').delete().eq('id', id)
     if (error) throw error
+  },
+}
+
+// ============================================================
+// Product Categories Service
+// ============================================================
+export const categoriesService = {
+  async getAll(): Promise<ProductCategory[]> {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name')
+
+    if (error) throw error
+
+    return (data || []).map(category => ({
+      id: category.id,
+      name: category.name,
+      description: category.description || '',
+      active: category.active ?? true,
+      createdAt: new Date(category.created_at),
+      updatedAt: new Date(category.updated_at),
+    }))
+  },
+
+  async create(category: Omit<ProductCategory, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProductCategory> {
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({
+        name: category.name,
+        description: category.description,
+        active: category.active,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return this.getById(data.id)
+  },
+
+  async update(id: string, category: Partial<ProductCategory>): Promise<ProductCategory> {
+    const { data, error } = await supabase
+      .from('categories')
+      .update({
+        name: category.name,
+        description: category.description,
+        active: category.active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return this.getById(id)
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  async getById(id: string): Promise<ProductCategory> {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) throw error
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      active: data.active ?? true,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+    }
   },
 }
