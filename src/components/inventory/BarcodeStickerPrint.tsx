@@ -5,31 +5,31 @@ import { renderBarcodeToSvg } from '../../lib/barcodeUtils';
 import { X, Printer, Minus, Plus } from 'lucide-react';
 
 const STICKER_CONFIG = {
-  stickerWidthMm: 40,
-  stickerHeightMm: 27,
+  stickerWidthMm: 42,
+  stickerHeightMm: 30,
   mediaWidthMm: 80,
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
   marginTopMm: 0.8,
   marginBottomMm: 0.8,
 
-  companyNameHeightMm: 2.0,
-  productNameBaseHeightMm: 2.0,
+  companyNameHeightMm: 2.2,
+  productNameBaseHeightMm: 2.2,
   productNameMaxLines: 2,
-  priceHeightMm: 3.0,
-  barcodeNumberHeightMm: 3.8,
+  priceHeightMm: 3.4,
+  barcodeNumberHeightMm: 4.2,
 
   gapMm: 0.3,
 
-  barcodeWidthMm: 36.8,
-  barcodeMinHeightMm: 10.5,
-  barcodeMaxHeightMm: 12.0,
+  barcodeWidthMm: 38.8,
+  barcodeMinHeightMm: 13.5,
+  barcodeMaxHeightMm: 15.0,
 
-  companyNameFontSizePt: 5.5,
-  productNameFontSizePt: 5.5,
-  productNameFontSizeSmallPt: 5.0,
-  priceFontSizePt: 8.5,
-  barcodeNumberFontSizePt: 9,
+  companyNameFontSizePt: 6.0,
+  productNameFontSizePt: 6.0,
+  productNameFontSizeSmallPt: 5.5,
+  priceFontSizePt: 9.5,
+  barcodeNumberFontSizePt: 10,
 } as const;
 
 const A4_GRID_CONFIG = {
@@ -37,10 +37,10 @@ const A4_GRID_CONFIG = {
   pageHeightMm: 297,
   columns: 4,
   rows: 8,
-  marginXMm: 9,
-  marginYMm: 6.5,
-  horizontalGapMm: 10,
-  verticalGapMm: 9,
+  marginXMm: 7,
+  marginYMm: 6,
+  horizontalGapMm: 9,
+  verticalGapMm: 6,
   showBorder: true,
 } as const;
 
