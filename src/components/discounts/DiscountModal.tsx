@@ -378,7 +378,7 @@ export function DiscountModal({ isOpen, onClose, discount }: DiscountModalProps)
                     />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium text-gray-900 truncate block">{product.name}</span>
-                      <span className="text-xs text-gray-500">{state.settings.currency} {product.price.toFixed(2)}</span>
+                      <span className="text-xs text-gray-500">{state.settings.currency} {(product.price || 0).toFixed(2)}</span>
                     </div>
                   </label>
                 ))}

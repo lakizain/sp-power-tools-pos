@@ -165,10 +165,10 @@ export function RentalsManager() {
           format(new Date(rental.rentFrom), 'yyyy-MM-dd'),
           format(new Date(rental.rentTo), 'yyyy-MM-dd'),
           anyRental.computedStatus,
-          rental.totalRent.toFixed(2),
-          rental.paidAmount.toFixed(2),
-          anyRental.balance.toFixed(2),
-          rental.securityDeposit.toFixed(2),
+          (rental.totalRent || 0).toFixed(2),
+          (rental.paidAmount || 0).toFixed(2),
+          (anyRental.balance || 0).toFixed(2),
+          (rental.securityDeposit || 0).toFixed(2),
           `"${(rental.notes || '').replace(/"/g, '""')}"`,
         ].join(',');
       })
@@ -299,7 +299,7 @@ export function RentalsManager() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-amber-50/80 text-xs font-semibold uppercase tracking-wide">This Month Rent</p>
-              <p className="text-3xl font-black mt-2">{state.settings.currency} {summary.thisMonthRent.toFixed(2)}</p>
+              <p className="text-3xl font-black mt-2">{state.settings.currency} {(summary.thisMonthRent || 0).toFixed(2)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <CreditCard className="h-6 w-6" />
@@ -310,7 +310,7 @@ export function RentalsManager() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-violet-50/80 text-xs font-semibold uppercase tracking-wide">Deposits Held</p>
-              <p className="text-3xl font-black mt-2">{state.settings.currency} {summary.totalDeposits.toFixed(2)}</p>
+              <p className="text-3xl font-black mt-2">{state.settings.currency} {(summary.totalDeposits || 0).toFixed(2)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <KeyRound className="h-6 w-6" />
@@ -416,7 +416,7 @@ export function RentalsManager() {
                           </div>
                           <div>
                             <div className="font-semibold text-gray-900 text-sm">{rental.customerName || 'Unknown Customer'}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">Balance: {state.settings.currency} {anyRental.balance.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500 mt-0.5">Balance: {state.settings.currency} {(anyRental.balance || 0).toFixed(2)}</div>
                           </div>
                         </div>
                       </td>
@@ -459,19 +459,19 @@ export function RentalsManager() {
                         <div className="space-y-1">
                           <div className="flex justify-between text-gray-700">
                             <span>Total Rent:</span>
-                            <span className="font-bold ml-3">{state.settings.currency} {rental.totalRent.toFixed(2)}</span>
+                            <span className="font-bold ml-3">{state.settings.currency} {(rental.totalRent || 0).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-emerald-700">
                             <span>Paid:</span>
-                            <span className="font-bold ml-3">{state.settings.currency} {rental.paidAmount.toFixed(2)}</span>
+                            <span className="font-bold ml-3">{state.settings.currency} {(rental.paidAmount || 0).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-rose-700">
                             <span>Balance:</span>
-                            <span className="font-bold ml-3">{state.settings.currency} {anyRental.balance.toFixed(2)}</span>
+                            <span className="font-bold ml-3">{state.settings.currency} {(anyRental.balance || 0).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-violet-700 pt-1 border-t border-gray-100">
                             <span>Deposit:</span>
-                            <span className="font-bold ml-3">{state.settings.currency} {rental.securityDeposit.toFixed(2)}</span>
+                            <span className="font-bold ml-3">{state.settings.currency} {(rental.securityDeposit || 0).toFixed(2)}</span>
                           </div>
                         </div>
                       </td>

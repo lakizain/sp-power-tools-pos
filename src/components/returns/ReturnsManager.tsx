@@ -109,7 +109,7 @@ export function ReturnsManager() {
     }
     const result = await swalConfig.confirm(
       'Delete Return Record?',
-      `Delete return for invoice "${r.invoiceNumber}" with refund amount of ${state.settings.currency} ${r.totalRefund.toFixed(2)}? This cannot be undone.`,
+      `Delete return for invoice "${r.invoiceNumber}" with refund amount of ${state.settings.currency} ${(r.totalRefund || 0).toFixed(2)}? This cannot be undone.`,
       'Delete'
     );
     if (result.isConfirmed) {
@@ -207,7 +207,7 @@ export function ReturnsManager() {
         r.reason,
         r.returnMethod,
         r.status,
-        r.totalRefund.toFixed(2),
+        (r.totalRefund || 0).toFixed(2),
         r.processedBy,
         `"${(r.notes || '').replace(/"/g, '""')}"`,
       ].join(','))
@@ -305,7 +305,7 @@ export function ReturnsManager() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-rose-100 text-sm font-medium">Total Refund</p>
-              <p className="text-xl md:text-2xl font-bold">{state.settings.currency} {summary.totalRefund.toFixed(2)}</p>
+              <p className="text-xl md:text-2xl font-bold">{state.settings.currency} {(summary.totalRefund || 0).toFixed(2)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <TrendingDown className="h-6 w-6" />
@@ -390,7 +390,7 @@ export function ReturnsManager() {
                         </div>
                       </div>
                       <div className="text-sm font-bold text-amber-700 whitespace-nowrap">
-                        {state.settings.currency} {s.total.toFixed(2)}
+                        {state.settings.currency} {(s.total || 0).toFixed(2)}
                       </div>
                     </div>
                   </li>
@@ -467,7 +467,7 @@ export function ReturnsManager() {
               <div className="text-left md:text-right">
                 <div className="text-xs text-gray-500 mb-0.5">Bill Total</div>
                 <div className="text-xl font-bold text-gray-900">
-                  {state.settings.currency} {searchedBill.total.toFixed(2)}
+                  {state.settings.currency} {(searchedBill.total || 0).toFixed(2)}
                 </div>
                 <button
                   onClick={handleReturnFullBill}
@@ -533,10 +533,10 @@ export function ReturnsManager() {
                             ×{qty}
                           </td>
                           <td className="px-3 md:px-4 py-3 text-right text-sm text-gray-700 hidden sm:table-cell">
-                            {state.settings.currency} {Number(unitPrice).toFixed(2)}
+                            {state.settings.currency} {(Number(unitPrice) || 0).toFixed(2)}
                           </td>
                           <td className="px-3 md:px-4 py-3 text-right text-sm font-bold text-gray-900">
-                            {state.settings.currency} {Number(lineTotal).toFixed(2)}
+                            {state.settings.currency} {(Number(lineTotal) || 0).toFixed(2)}
                           </td>
                           <td className="px-3 md:px-4 py-3 text-right">
                             <button
@@ -687,7 +687,7 @@ export function ReturnsManager() {
                     </td>
                     <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right">
                       <div className="text-sm font-bold text-gray-900">
-                        {state.settings.currency} {r.totalRefund.toFixed(2)}
+                        {state.settings.currency} {(r.totalRefund || 0).toFixed(2)}
                       </div>
                       {r.paymentMethod && (
                         <div className="text-[11px] text-gray-500 capitalize mt-0.5">

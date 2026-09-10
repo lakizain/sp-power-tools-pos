@@ -192,7 +192,7 @@ export function SupplierManager() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm font-medium">Total Purchases</p>
-              <p className="text-xl md:text-2xl font-bold">{state.settings.currency} {summary.totalPurchases.toFixed(2)}</p>
+              <p className="text-xl md:text-2xl font-bold">{state.settings.currency} {(summary.totalPurchases || 0).toFixed(2)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <DollarSign className="h-6 w-6" />
@@ -204,7 +204,7 @@ export function SupplierManager() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-orange-100 text-sm font-medium">Outstanding</p>
-              <p className="text-xl md:text-2xl font-bold">{state.settings.currency} {summary.totalOutstanding.toFixed(2)}</p>
+              <p className="text-xl md:text-2xl font-bold">{state.settings.currency} {(summary.totalOutstanding || 0).toFixed(2)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-xl">
               <AlertCircle className="h-6 w-6" />

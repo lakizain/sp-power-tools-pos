@@ -68,7 +68,7 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
         } else if (soldQty > 0 && soldSubtotal > 0) {
           unitPrice = soldSubtotal / soldQty;
         }
-        unitPrice = Number(unitPrice.toFixed(2));
+        unitPrice = Number(((unitPrice) || 0).toFixed(2));
         const defaultQty = isSingleItem ? soldQty : 1;
         return {
           productId,
@@ -76,7 +76,7 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
           sku,
           quantity: defaultQty,
           unitPrice,
-          subtotal: Number((defaultQty * unitPrice).toFixed(2)),
+          subtotal: Number(((defaultQty * unitPrice) || 0).toFixed(2)),
           condition: 'used' as ReturnItem['condition'],
           reason: initialReturnMethod === 'rental_return' ? 'Rental Item Returned' : '',
         };
@@ -114,7 +114,7 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
       const next = [...prev];
       const updated = { ...next[index], ...patch };
       updated.quantity = Math.max(0, updated.quantity || 0);
-      updated.subtotal = Number((updated.quantity * updated.unitPrice).toFixed(2));
+      updated.subtotal = Number(((updated.quantity * updated.unitPrice) || 0).toFixed(2));
       next[index] = updated;
       return next;
     });
@@ -147,8 +147,8 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
-    const taxAmount = Number((subtotal * (state.settings.taxRate || 0) / 100).toFixed(2));
-    const computedTotal = Number((subtotal + taxAmount).toFixed(2));
+    const taxAmount = Number((((subtotal * (state.settings.taxRate || 0) / 100)) || 0).toFixed(2));
+    const computedTotal = Number(((subtotal + taxAmount) || 0).toFixed(2));
     return {
       subtotal: isRentalReturn ? 0 : subtotal,
       taxAmount: isRentalReturn ? 0 : taxAmount,
@@ -392,7 +392,7 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
                       <div>
                         <label className="block text-[11px] font-semibold text-gray-600 mb-1">Subtotal</label>
                         <div className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-900">
-                          {state.settings.currency} {item.subtotal.toFixed(2)}
+                          {state.settings.currency} {(item.subtotal || 0).toFixed(2)}
                         </div>
                       </div>
                     </div>
@@ -418,17 +418,17 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
               <>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Items Subtotal:</span>
-                  <span className="font-medium">{state.settings.currency} {totals.subtotal.toFixed(2)}</span>
+                  <span className="font-medium">{state.settings.currency} {(totals.subtotal || 0).toFixed(2)}</span>
                 </div>
                 {state.settings.taxRate > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tax ({state.settings.taxRate}%):</span>
-                    <span className="font-medium">{state.settings.currency} {totals.taxAmount.toFixed(2)}</span>
+                    <span className="font-medium">{state.settings.currency} {(totals.taxAmount || 0).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-amber-200/60">
                   <span>Total Refund:</span>
-                  <span className="text-amber-700">{state.settings.currency} {totals.totalRefund.toFixed(2)}</span>
+                  <span className="text-amber-700">{state.settings.currency} {(totals.totalRefund || 0).toFixed(2)}</span>
                 </div>
               </>
             ) : (

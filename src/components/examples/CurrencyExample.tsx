@@ -110,8 +110,8 @@ export function CurrencyExample() {
                                     <h4 className="font-semibold text-green-800 mb-2">Conversion Result</h4>
                                     <div className="space-y-1 text-sm text-green-700">
                                         <p>Original: {conversionResult.originalAmount} {conversionResult.fromCurrency}</p>
-                                        <p>Converted: {conversionResult.convertedAmount.toFixed(2)} {conversionResult.toCurrency}</p>
-                                        <p>Rate: {conversionResult.exchangeRate.toFixed(6)}</p>
+                                        <p>Converted: {(conversionResult.convertedAmount || 0).toFixed(2)} {conversionResult.toCurrency}</p>
+                                        <p>Rate: {(conversionResult.exchangeRate || 0).toFixed(6)}</p>
                                         <p>Time: {conversionResult.timestamp.toLocaleString()}</p>
                                     </div>
                                 </div>
