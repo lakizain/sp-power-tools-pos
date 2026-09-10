@@ -367,12 +367,36 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
     }
   };
 
+  const calculateSuggestedSalePrice = (cost: number): number | null => {
+    if (cost <= 0) return null;
+    let multiplier: number | null = null;
+    if (cost < 1000) multiplier = 1.50;
+    else if (cost < 5000) multiplier = 1.45;
+    else if (cost < 25000) multiplier = 1.40;
+    else if (cost < 50000) multiplier = 1.35;
+    else if (cost < 100000) multiplier = 1.30;
+    else if (cost <= 250000) multiplier = 1.25;
+    if (multiplier === null) return null;
+    return Math.round((cost * multiplier) * 100) / 100;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }));
+    const checked = type === 'checkbox' ? (e.target as HTMLInputElement).checked : false;
+    setFormData(prev => {
+      const next: typeof prev = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+      if (name === 'cost' && !formData.isWeightBased) {
+        const costNum = parseFloat(value);
+        const suggested = calculateSuggestedSalePrice(costNum);
+        if (suggested !== null) {
+          next.price = suggested.toString();
+        }
+      }
+      return next;
+    });
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -617,6 +641,23 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Cost Price *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="cost"
+                  value={formData.cost}
+                  onChange={handleChange}
+                  required
+                  className="input"
+                  placeholder="0.00"
+                />
+              </div>
+
               {formData.isWeightBased ? (
                 <>
                   <div>
@@ -635,7 +676,7 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
                       placeholder="0.00"
                     />
                   </div>
-                  <div>
+                  <div className="md:col-start-2 md:row-start-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Unit *
                     </label>
@@ -670,25 +711,18 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
                     className="input"
                     placeholder="0.00"
                   />
+                  {formData.cost && parseFloat(formData.cost) > 250000 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      ℹ️ Cost exceeds Rs 250,000 — please enter sale price manually
+                    </p>
+                  )}
+                  {formData.cost && parseFloat(formData.cost) <= 250000 && parseFloat(formData.cost) > 0 && (
+                    <p className="text-xs text-emerald-600 mt-1">
+                      ✓ Auto-calculated from cost. You can adjust manually.
+                    </p>
+                  )}
                 </div>
               )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cost Price *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  name="cost"
-                  value={formData.cost}
-                  onChange={handleChange}
-                  required
-                  className="input"
-                  placeholder="0.00"
-                />
-              </div>
             </div>
 
             <div className="mt-6 mb-4">
