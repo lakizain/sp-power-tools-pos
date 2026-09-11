@@ -45,13 +45,13 @@ const A4_CONFIG = {
   pageHeightMm: 210,
   portraitWidthMm: 210,
   portraitHeightMm: 297,
-  marginXMm: 12,
-  marginYMm: 12,
-  headerHeightMm: 40,
-  summaryHeightMm: 30,
-  footerHeightMm: 15,
-  tableHeaderHeightMm: 10,
-  tableRowHeightMm: 8,
+  marginXMm: 8,
+  marginYMm: 8,
+  headerHeightMm: 24,
+  summaryHeightMm: 18,
+  footerHeightMm: 9,
+  tableHeaderHeightMm: 6.5,
+  tableRowHeightMm: 5.8,
 };
 
 export function TablePrintModal<T>({
@@ -80,7 +80,7 @@ export function TablePrintModal<T>({
       A4_CONFIG.tableHeaderHeightMm +
       A4_CONFIG.footerHeightMm +
       A4_CONFIG.marginYMm * 2;
-    const remaining = pageH - used - 10;
+    const remaining = pageH - used - 6;
     return Math.max(5, Math.floor(remaining / A4_CONFIG.tableRowHeightMm));
   }, [pageH, summaries]);
 
@@ -170,29 +170,29 @@ export function TablePrintModal<T>({
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'flex-start',
-                paddingBottom: mm(4),
-                borderBottom: '0.3mm solid #1f2937',
-                marginBottom: mm(3),
+                paddingBottom: mm(2),
+                borderBottom: '0.2mm solid #1f2937',
+                marginBottom: mm(1.5),
               }}
             >
               <div>
                 <div
                   style={{
-                    fontSize: '16pt',
+                    fontSize: '13pt',
                     fontWeight: 800,
                     color: '#111827',
                     letterSpacing: '-0.01em',
-                    lineHeight: 1.2,
+                    lineHeight: 1.1,
                   }}
                 >
                   {storeName}
                 </div>
                 <div
                   style={{
-                    fontSize: '11pt',
+                    fontSize: '9pt',
                     fontWeight: 700,
                     color: '#1f2937',
-                    marginTop: mm(1.5),
+                    marginTop: mm(0.8),
                   }}
                 >
                   {title}
@@ -200,19 +200,19 @@ export function TablePrintModal<T>({
                 {subtitle && (
                   <div
                     style={{
-                      fontSize: '9pt',
+                      fontSize: '7.5pt',
                       color: '#6b7280',
-                      marginTop: mm(0.5),
+                      marginTop: mm(0.3),
                     }}
                   >
                     {subtitle}
                   </div>
                 )}
               </div>
-              <div style={{ textAlign: 'right', fontSize: '8pt', color: '#4b5563' }}>
+              <div style={{ textAlign: 'right', fontSize: '6.8pt', color: '#4b5563' }}>
                 <div style={{ fontWeight: 600 }}>Generated</div>
                 <div style={{ fontFamily: 'monospace' }}>{generatedAt}</div>
-                <div style={{ marginTop: mm(2), fontWeight: 600 }}>Page</div>
+                <div style={{ marginTop: mm(0.8), fontWeight: 600 }}>Page</div>
                 <div style={{ fontFamily: 'monospace' }}>{p + 1} / {totalPages}</div>
               </div>
             </div>
@@ -222,12 +222,12 @@ export function TablePrintModal<T>({
                 style={{
                   display: 'flex',
                   flexWrap: 'wrap',
-                  gap: mm(3),
-                  padding: mm(2),
+                  gap: mm(1.5),
+                  padding: mm(1.2),
                   background: '#f9fafb',
-                  borderRadius: mm(1),
-                  marginBottom: mm(2),
-                  fontSize: '8pt',
+                  borderRadius: mm(0.8),
+                  marginBottom: mm(1.2),
+                  fontSize: '7.2pt',
                 }}
               >
                 {filters.map((f, i) => (
@@ -244,8 +244,8 @@ export function TablePrintModal<T>({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: `repeat(${Math.min(summaries.length, 4)}, 1fr)`,
-                  gap: mm(3),
-                  marginBottom: mm(3),
+                  gap: mm(1.5),
+                  marginBottom: mm(1.5),
                 }}
               >
                 {summaries.map((s, i) => (
@@ -253,14 +253,14 @@ export function TablePrintModal<T>({
                     key={i}
                     style={{
                       background: s.highlight ? '#fef3c7' : '#f3f4f6',
-                      borderLeft: s.highlight ? '1mm solid #f59e0b' : '0.5mm solid #d1d5db',
-                      padding: mm(2),
-                      borderRadius: mm(1),
+                      borderLeft: s.highlight ? '0.7mm solid #f59e0b' : '0.4mm solid #d1d5db',
+                      padding: mm(1.3),
+                      borderRadius: mm(0.8),
                     }}
                   >
                     <div
                       style={{
-                        fontSize: '7.5pt',
+                        fontSize: '6.5pt',
                         color: '#6b7280',
                         fontWeight: 600,
                         textTransform: 'uppercase',
@@ -271,10 +271,10 @@ export function TablePrintModal<T>({
                     </div>
                     <div
                       style={{
-                        fontSize: '12pt',
+                        fontSize: '10pt',
                         fontWeight: 800,
                         color: s.highlight ? '#92400e' : '#111827',
-                        marginTop: mm(0.8),
+                        marginTop: mm(0.4),
                       }}
                     >
                       {s.value}
@@ -289,7 +289,7 @@ export function TablePrintModal<T>({
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
-                  fontSize: '8pt',
+                  fontSize: '7.5pt',
                   tableLayout: 'fixed',
                 }}
               >
@@ -302,15 +302,15 @@ export function TablePrintModal<T>({
                           color: '#ffffff',
                           fontWeight: 700,
                           textAlign: col.align || 'left',
-                          padding: `${mm(1.5)} ${mm(2)}`,
-                          fontSize: '7.5pt',
+                          padding: `${mm(0.9)} ${mm(1.2)}`,
+                          fontSize: '6.8pt',
                           textTransform: 'uppercase',
-                          letterSpacing: '0.03em',
+                          letterSpacing: '0.025em',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           width: col.width || 'auto',
-                          borderRight: i < columns.length - 1 ? '0.1mm solid #374151' : 'none',
+                          borderRight: i < columns.length - 1 ? '0.08mm solid #374151' : 'none',
                         }}
                       >
                         {col.header}
@@ -340,7 +340,7 @@ export function TablePrintModal<T>({
                         key={ri}
                         style={{
                           background: ri % 2 === 0 ? '#ffffff' : '#f9fafb',
-                          borderBottom: '0.1mm solid #e5e7eb',
+                          borderBottom: '0.08mm solid #e5e7eb',
                         }}
                       >
                         {columns.map((col, ci) => {
@@ -350,15 +350,15 @@ export function TablePrintModal<T>({
                               key={ci}
                               style={{
                                 textAlign: col.align || 'left',
-                                padding: `${mm(1.2)} ${mm(2)}`,
+                                padding: `${mm(0.6)} ${mm(1.2)}`,
                                 color: '#1f2937',
-                                verticalAlign: 'top',
-                                borderRight: ci < columns.length - 1 ? '0.05mm solid #f3f4f6' : 'none',
+                                verticalAlign: 'middle',
+                                borderRight: ci < columns.length - 1 ? '0.04mm solid #f3f4f6' : 'none',
                                 wordBreak: 'break-word',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
-                                fontSize: '8pt',
-                                lineHeight: 1.3,
+                                fontSize: '7.4pt',
+                                lineHeight: 1.12,
                               }}
                             >
                               {typeof val === 'string' || typeof val === 'number' ? val : val}
@@ -378,16 +378,16 @@ export function TablePrintModal<T>({
                 bottom: 0,
                 left: 0,
                 right: 0,
-                paddingTop: mm(2),
-                borderTop: '0.2mm solid #d1d5db',
+                paddingTop: mm(1.2),
+                borderTop: '0.15mm solid #d1d5db',
                 display: 'flex',
                 justifyContent: 'space-between',
-                fontSize: '7pt',
+                fontSize: '6.3pt',
                 color: '#6b7280',
               }}
             >
               <div>
-                <FileText style={{ display: 'inline', width: '8pt', height: '8pt', marginRight: mm(0.5), verticalAlign: 'middle' }} />
+                <FileText style={{ display: 'inline', width: '7pt', height: '7pt', marginRight: mm(0.4), verticalAlign: 'middle' }} />
                 Currency: {currency}
               </div>
               <div style={{ fontStyle: 'italic' }}>

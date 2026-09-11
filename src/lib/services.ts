@@ -174,6 +174,21 @@ export const productsService = {
     if (error) throw error
   },
 
+  async batchStockUpdate(updates: { id: string; stockChange: number; newStock: number }[]): Promise<void> {
+    if (updates.length === 0) return;
+
+    const promises = updates.map(u =>
+      supabase
+        .from('products')
+        .update({ stock: u.newStock })
+        .eq('id', u.id)
+    );
+
+    const results = await Promise.all(promises);
+    const firstError = results.find(r => r.error);
+    if (firstError?.error) throw firstError.error;
+  },
+
   async getById(id: string): Promise<Product> {
     const { data, error } = await supabase
       .from('products')

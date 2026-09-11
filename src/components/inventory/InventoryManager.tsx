@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Printer, FolderPlus, CalendarRange, Download } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Printer, FolderPlus, CalendarRange, Download, SlidersHorizontal } from 'lucide-react';
 import { Product, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { ProductModal } from './ProductModal';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
 import { CategoryModal } from './CategoryModal';
+import { StockAdjustmentModal } from './StockAdjustmentModal';
 import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek } from 'date-fns';
@@ -27,6 +28,9 @@ export function InventoryManager() {
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [showStockAdjustModal, setShowStockAdjustModal] = useState(false);
+  const [stockAdjustProducts, setStockAdjustProducts] = useState<Product[]>([]);
 
   const loadDbCategories = async () => {
     try {
@@ -297,6 +301,46 @@ export function InventoryManager() {
     setShowStickerPrint(true);
   };
 
+  const handleToggleSelect = (productId: string) => {
+    setSelectedProductIds(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedProductIds.size === filteredProducts.length) {
+      setSelectedProductIds(new Set());
+    } else {
+      setSelectedProductIds(new Set(filteredProducts.map(p => p.id)));
+    }
+  };
+
+  const handleSingleStockAdjust = (product: Product) => {
+    setStockAdjustProducts([product]);
+    setShowStockAdjustModal(true);
+  };
+
+  const handleBulkStockAdjust = () => {
+    const selected = filteredProducts.filter(p => selectedProductIds.has(p.id));
+    if (selected.length === 0) {
+      swalConfig.error('Please select at least one product to adjust stock.');
+      return;
+    }
+    setStockAdjustProducts(selected);
+    setShowStockAdjustModal(true);
+  };
+
+  const handleStockAdjustmentComplete = () => {
+    setSelectedProductIds(new Set());
+    window.location.reload();
+  };
+
   return (
     <div className="p-4 lg:p-6 space-y-6 bg-gray-50 min-h-full">
       {/* Header */}
@@ -307,6 +351,15 @@ export function InventoryManager() {
         </div>
         
         <div className="flex flex-wrap gap-3">
+          {selectedProductIds.size > 0 && (
+            <button
+              onClick={handleBulkStockAdjust}
+              className="flex items-center space-x-2 px-4 py-2 bg-indigo-500 text-white rounded-xl hover:bg-indigo-600 transition-all font-medium shadow-md shadow-indigo-200"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span>Adjust Stock ({selectedProductIds.size})</span>
+            </button>
+          )}
           <button
             onClick={() => setShowPrintModal(true)}
             className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
@@ -416,7 +469,7 @@ export function InventoryManager() {
 
             <select
               value={stockFilter}
-              onChange={(e) => setStockFilter(e.target.value as any)}
+              onChange={(e) => setStockFilter(e.target.value as 'all' | 'in_stock' | 'low_stock' | 'out_of_stock')}
               className="select min-w-[150px]"
             >
               <option value="all">All Stock Status</option>
@@ -493,6 +546,14 @@ export function InventoryManager() {
           <table className="table">
             <thead className="table-header">
               <tr>
+                <th className="table-header-cell w-12">
+                  <input
+                    type="checkbox"
+                    checked={filteredProducts.length > 0 && selectedProductIds.size === filteredProducts.length}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                  />
+                </th>
                 <th className="table-header-cell">Product</th>
                 <th className="table-header-cell">SKU</th>
                 <th className="table-header-cell">Category</th>
@@ -507,9 +568,18 @@ export function InventoryManager() {
               {filteredProducts.map((product) => {
                 const isLowStock = product.trackInventory && product.stock <= product.minStock;
                 const isOutOfStock = product.trackInventory && product.stock === 0;
+                const isSelected = selectedProductIds.has(product.id);
                 
                 return (
-                  <tr key={product.id} className="table-row">
+                  <tr key={product.id} className={`table-row ${isSelected ? 'bg-indigo-50/50' : ''}`}>
+                    <td className="table-cell w-12">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleSelect(product.id)}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
+                      />
+                    </td>
                     <td className="table-cell">
                       <div className="flex items-center">
                         <div className="h-10 w-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -556,6 +626,13 @@ export function InventoryManager() {
                     </td>
                     <td className="table-cell text-right">
                       <div className="flex items-center justify-end space-x-1">
+                        <button
+                          onClick={() => handleSingleStockAdjust(product)}
+                          className="text-indigo-600 hover:text-indigo-900 p-2 rounded-lg hover:bg-indigo-50 transition-colors"
+                          title="Adjust stock level"
+                        >
+                          <SlidersHorizontal className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => handlePrintSticker(product)}
                           className={`p-2 rounded-lg transition-colors ${product.barcode ? 'text-green-600 hover:text-green-900 hover:bg-green-50' : 'text-gray-300 cursor-not-allowed'}`}
@@ -606,6 +683,16 @@ export function InventoryManager() {
         onCategoriesChanged={() => {
           loadDbCategories();
         }}
+      />
+
+      <StockAdjustmentModal
+        isOpen={showStockAdjustModal}
+        onClose={() => {
+          setShowStockAdjustModal(false);
+          setStockAdjustProducts([]);
+        }}
+        products={stockAdjustProducts}
+        onAdjustmentComplete={handleStockAdjustmentComplete}
       />
 
       <TablePrintModal

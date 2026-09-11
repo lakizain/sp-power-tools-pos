@@ -100,6 +100,50 @@ const THERMAL_ROLL_CONFIG = {
   previewMaxCopies: 3,
 } as const;
 
+const THERMAL_50_CONFIG = {
+  pageWidthMm: 80,
+  pageHeightMm: 25,
+
+  stickerWidthMm: 50,
+  stickerHeightMm: 25,
+
+  marginLeftMm: 1.0,
+  marginRightMm: 1.0,
+  marginTopMm: 1.0,
+  marginBottomMm: 1.0,
+
+  companyNameHeightMm: 1.9,
+
+  productNameBaseHeightMm: 2.6,
+  productNameMaxLines: 2,
+
+  priceHeightMm: 2.8,
+
+  barcodeNumberHeightMm: 2.6,
+
+  gapMm: 0.25,
+
+  barcodeWidthMm: 46.8,
+
+  barcodeMinHeightMm: 10.0,
+  barcodeMaxHeightMm: 11.0,
+
+  companyNameFontSizePt: 6.8,
+  productNameFontSizePt: 7.0,
+  productNameFontSizeSmallPt: 6.2,
+  priceFontSizePt: 9.2,
+  barcodeNumberFontSizePt: 6.6,
+} as const;
+
+const THERMAL_50_ROLL_CONFIG = {
+  mediaWidthMm: 80,
+  stickerOffsetLeftMm: 15,
+  stickerOffsetTopMm: 4.5,
+  stickerGapMm: 7,
+  bottomPaddingMm: 4.5,
+  previewMaxCopies: 3,
+} as const;
+
 /**
  * ============================================================
  * A4 STICKER CONFIG
@@ -157,11 +201,16 @@ const A4_GRID_CONFIG = {
   showBorder: true,
 } as const;
 
-type PrintMode = 'thermal' | 'a4grid';
+type PrintMode = 'thermal' | 'thermal50' | 'a4grid';
 
 type StickerConfig =
   | typeof THERMAL_CONFIG
+  | typeof THERMAL_50_CONFIG
   | typeof A4_STICKER_CONFIG;
+
+type RollConfig =
+  | typeof THERMAL_ROLL_CONFIG
+  | typeof THERMAL_50_ROLL_CONFIG;
 
 /**
  * Convert number to CSS mm.
@@ -176,9 +225,20 @@ function mm(n: number): string {
  * ============================================================
  */
 function getStickerConfig(mode: PrintMode): StickerConfig {
-  return mode === 'thermal'
-    ? THERMAL_CONFIG
-    : A4_STICKER_CONFIG;
+  switch (mode) {
+    case 'thermal':
+      return THERMAL_CONFIG;
+    case 'thermal50':
+      return THERMAL_50_CONFIG;
+    default:
+      return A4_STICKER_CONFIG;
+  }
+}
+
+function getRollConfig(mode: PrintMode): RollConfig {
+  return mode === 'thermal50'
+    ? THERMAL_50_ROLL_CONFIG
+    : THERMAL_ROLL_CONFIG;
 }
 
 /**
@@ -191,7 +251,7 @@ function calculateLayout(
   config: StickerConfig
 ) {
   const isThermal =
-    config === THERMAL_CONFIG;
+    config !== A4_STICKER_CONFIG;
 
   const {
     stickerWidthMm,
@@ -493,7 +553,7 @@ export function BarcodeStickerPrint({
     useState(1);
 
   const [mode, setMode] =
-    useState<PrintMode>('thermal');
+    useState<PrintMode>('a4grid');
 
   /**
    * ============================================================
@@ -523,6 +583,12 @@ export function BarcodeStickerPrint({
   const stickerConfig =
     useMemo(
       () => getStickerConfig(mode),
+      [mode]
+    );
+
+  const rollConfig =
+    useMemo(
+      () => getRollConfig(mode),
       [mode]
     );
 
@@ -718,8 +784,6 @@ export function BarcodeStickerPrint({
   }
 
   const {
-    stickerWidthMm,
-    stickerHeightMm,
     companyName: cn,
     productName: pn,
     price: pr,
@@ -758,7 +822,7 @@ export function BarcodeStickerPrint({
 
     showBarcodeNumber: true,
 
-    leftAlignContent: mode === 'thermal',
+    leftAlignContent: mode !== 'a4grid',
 
     showBorder:
       mode === 'a4grid' &&
@@ -769,27 +833,21 @@ export function BarcodeStickerPrint({
    * ============================================================
    * THERMAL SHEET
    * ============================================================
-   *
-   * Every sticker is exactly:
-   *
-   * 38mm × 25mm
-   *
-   * 80mm roll canvas with left-aligned stacked labels.
    */
   const renderThermalSheet = () => {
     const rollHeightMm =
-      THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+      rollConfig.stickerOffsetTopMm +
       copies *
-        THERMAL_CONFIG.stickerHeightMm +
+        stickerConfig.stickerHeightMm +
       Math.max(0, copies - 1) *
-        THERMAL_ROLL_CONFIG.stickerGapMm +
-      THERMAL_ROLL_CONFIG.bottomPaddingMm;
+        rollConfig.stickerGapMm +
+      rollConfig.bottomPaddingMm;
 
     return (
       <div
         style={{
           width: mm(
-            THERMAL_ROLL_CONFIG.mediaWidthMm
+            rollConfig.mediaWidthMm
           ),
           minHeight: mm(rollHeightMm),
           position: 'relative',
@@ -805,20 +863,20 @@ export function BarcodeStickerPrint({
             key={`thermal-${i}`}
             style={{
               width: mm(
-                THERMAL_CONFIG.stickerWidthMm
+                stickerConfig.stickerWidthMm
               ),
               height: mm(
-                THERMAL_CONFIG.stickerHeightMm
+                stickerConfig.stickerHeightMm
               ),
               position: 'absolute',
               left: mm(
-                THERMAL_ROLL_CONFIG.stickerOffsetLeftMm
+                rollConfig.stickerOffsetLeftMm
               ),
               top: mm(
-                THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+                rollConfig.stickerOffsetTopMm +
                   i *
-                    (THERMAL_CONFIG.stickerHeightMm +
-                      THERMAL_ROLL_CONFIG.stickerGapMm)
+                    (stickerConfig.stickerHeightMm +
+                      rollConfig.stickerGapMm)
               ),
               overflow: 'hidden',
               background: '#ffffff',
@@ -979,32 +1037,32 @@ export function BarcodeStickerPrint({
      * THERMAL PREVIEW
      * ----------------------------------------------------------
      */
-    if (mode === 'thermal') {
+    if (mode !== 'a4grid') {
       const pxPerMm =
         3.7795275591;
 
       const previewCopies =
         Math.min(
           copies,
-          THERMAL_ROLL_CONFIG.previewMaxCopies
+          rollConfig.previewMaxCopies
         );
 
       const rollHeightMm =
-        THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+        rollConfig.stickerOffsetTopMm +
         previewCopies *
-          THERMAL_CONFIG.stickerHeightMm +
+          stickerConfig.stickerHeightMm +
         Math.max(
           0,
           previewCopies - 1
         ) *
-          THERMAL_ROLL_CONFIG.stickerGapMm +
-        THERMAL_ROLL_CONFIG.bottomPaddingMm;
+          rollConfig.stickerGapMm +
+        rollConfig.bottomPaddingMm;
 
       return (
         <div
           style={{
             width:
-              `${THERMAL_ROLL_CONFIG.mediaWidthMm * pxPerMm}px`,
+              `${rollConfig.mediaWidthMm * pxPerMm}px`,
 
             height:
               `${rollHeightMm * pxPerMm}px`,
@@ -1033,13 +1091,13 @@ export function BarcodeStickerPrint({
               key={`pv-thermal-${i}`}
               style={{
                 position: 'absolute',
-                left: `${THERMAL_ROLL_CONFIG.stickerOffsetLeftMm * pxPerMm}px`,
-                top: `${(THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+                left: `${rollConfig.stickerOffsetLeftMm * pxPerMm}px`,
+                top: `${(rollConfig.stickerOffsetTopMm +
                   i *
-                    (THERMAL_CONFIG.stickerHeightMm +
-                      THERMAL_ROLL_CONFIG.stickerGapMm)) * pxPerMm}px`,
-                width: `${THERMAL_CONFIG.stickerWidthMm * pxPerMm}px`,
-                height: `${THERMAL_CONFIG.stickerHeightMm * pxPerMm}px`,
+                    (stickerConfig.stickerHeightMm +
+                      rollConfig.stickerGapMm)) * pxPerMm}px`,
+                width: `${stickerConfig.stickerWidthMm * pxPerMm}px`,
+                height: `${stickerConfig.stickerHeightMm * pxPerMm}px`,
                 background: '#ffffff',
                 boxSizing: 'border-box',
                 overflow: 'hidden',
@@ -1282,9 +1340,9 @@ export function BarcodeStickerPrint({
                   Print Mode
                 </label>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
 
-                  {/* THERMAL */}
+                  {/* THERMAL 38 */}
                   <button
                     onClick={() =>
                       setMode('thermal')
@@ -1299,6 +1357,24 @@ export function BarcodeStickerPrint({
 
                     <div className="text-xs font-normal mt-0.5 opacity-80">
                       38×25mm · Xprinter
+                    </div>
+                  </button>
+
+                  {/* THERMAL 50 */}
+                  <button
+                    onClick={() =>
+                      setMode('thermal50')
+                    }
+                    className={`px-3 py-2 rounded-lg text-sm font-medium border-2 transition ${
+                      mode === 'thermal50'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    🖨️ Thermal Roll
+
+                    <div className="text-xs font-normal mt-0.5 opacity-80">
+                      50×25mm · Xprinter
                     </div>
                   </button>
 
@@ -1390,9 +1466,9 @@ export function BarcodeStickerPrint({
 
                 <p className="text-xs text-gray-500 mt-2">
 
-                  {mode === 'thermal'
-                    ? `Sticker: ${THERMAL_CONFIG.stickerWidthMm}×${THERMAL_CONFIG.stickerHeightMm}mm · Left-aligned on 80mm printer path`
-                    : `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Column-major`}
+                  {mode === 'a4grid'
+                    ? `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Column-major`
+                    : `Sticker: ${stickerConfig.stickerWidthMm}×${stickerConfig.stickerHeightMm}mm · ${rollConfig.stickerOffsetLeftMm > 0 ? 'Centered' : 'Left-aligned'} on ${rollConfig.mediaWidthMm}mm printer path`}
 
                   {mode === 'a4grid' &&
                     copies > 0 && (
@@ -1434,7 +1510,7 @@ export function BarcodeStickerPrint({
             display: 'none',
           }}
         >
-          {mode === 'thermal'
+          {mode !== 'a4grid'
             ? renderThermalSheet()
             : renderA4GridSheet()}
         </div>
@@ -1490,6 +1566,11 @@ export function BarcodeStickerPrint({
            * 80mm roll width.
            */
           @page thermal {
+            size: 80mm auto;
+            margin: 0;
+          }
+
+          @page thermal50 {
             size: 80mm auto;
             margin: 0;
           }
@@ -1593,7 +1674,8 @@ export function BarcodeStickerPrint({
                THERMAL / XPRINTER
             ================================================== */
 
-            #barcode-sticker-print-root[data-print-mode="thermal"] {
+            #barcode-sticker-print-root[data-print-mode="thermal"],
+            #barcode-sticker-print-root[data-print-mode="thermal50"] {
               page: thermal !important;
 
               width: 80mm !important;
@@ -1605,11 +1687,16 @@ export function BarcodeStickerPrint({
               box-sizing: border-box !important;
             }
 
+            #barcode-sticker-print-root[data-print-mode="thermal50"] {
+              page: thermal50 !important;
+            }
+
 
             /*
              * Thermal roll wrapper.
              */
-            #barcode-sticker-print-root[data-print-mode="thermal"] > div {
+            #barcode-sticker-print-root[data-print-mode="thermal"] > div,
+            #barcode-sticker-print-root[data-print-mode="thermal50"] > div {
               width: 80mm !important;
               height: auto !important;
 
@@ -1630,7 +1717,8 @@ export function BarcodeStickerPrint({
              * Prevent any unexpected margins
              * inside thermal print root.
              */
-            #barcode-sticker-print-root[data-print-mode="thermal"] div {
+            #barcode-sticker-print-root[data-print-mode="thermal"] div,
+            #barcode-sticker-print-root[data-print-mode="thermal50"] div {
               box-sizing: border-box;
             }
 
