@@ -3,7 +3,7 @@ import { X, Scale, ScanLine, Wand2, Printer, FolderPlus, RefreshCw } from 'lucid
 import { Product, ProductBatch, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import Swal from 'sweetalert2';
-import { generateBarcodeNumber, generateSimpleBarcodeNumber, renderBarcodeToCanvas } from '../../lib/barcodeUtils';
+import { generateEan13, toValidEan13, isValidEan13, renderBarcodeToCanvas } from '../../lib/barcodeUtils';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
 import { CategoryModal } from './CategoryModal';
 
@@ -129,12 +129,12 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
       if (scanBufferRef.current.length >= 3) {
         e.preventDefault();
         e.stopPropagation();
-        const scannedBarcode = scanBufferRef.current.trim();
+        const scannedBarcode = toValidEan13(scanBufferRef.current.trim());
         setFormData(prev => ({ ...prev, barcode: scannedBarcode }));
         setIsScanningBarcode(false);
         scanBufferRef.current = '';
         Swal.fire({
-          title: 'Barcode Scanned!',
+          title: 'EAN-13 Barcode Scanned!',
           icon: 'success',
           toast: true,
           position: 'top-end',
@@ -187,12 +187,10 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   };
 
   const handleGenerateBarcode = () => {
-    const newBarcode = formData.name.trim()
-      ? generateBarcodeNumber(formData.name, formData.sku)
-      : generateSimpleBarcodeNumber();
+    const newBarcode = generateEan13(formData.sku);
     setFormData(prev => ({ ...prev, barcode: newBarcode }));
     Swal.fire({
-      title: 'Barcode Generated!',
+      title: 'EAN-13 Barcode Generated!',
       icon: 'success',
       toast: true,
       position: 'top-end',
@@ -204,7 +202,9 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
 
   useEffect(() => {
     if (barcodePreviewCanvasRef.current && formData.barcode) {
-      renderBarcodeToCanvas(barcodePreviewCanvasRef.current, formData.barcode, {
+      const eanBarcode = toValidEan13(formData.barcode);
+      renderBarcodeToCanvas(barcodePreviewCanvasRef.current, eanBarcode, {
+        format: 'EAN13',
         height: 50,
         fontSize: 12,
       });
@@ -300,11 +300,13 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
       }
     }
 
+    const normalizedBarcode = formData.barcode ? toValidEan13(formData.barcode) : undefined;
+
     const productData: Product = {
       id: product?.id || Date.now().toString(),
       name: formData.name,
       sku: formData.sku,
-      barcode: formData.barcode || undefined,
+      barcode: normalizedBarcode,
       price: formData.isWeightBased ? 0 : parseFloat(formData.price),
       cost: parseFloat(formData.cost),
       stock: formData.trackInventory ? parseInt(formData.stock) : 999999,
