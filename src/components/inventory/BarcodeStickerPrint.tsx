@@ -1,22 +1,116 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Product } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
-import { renderBarcodeToSvg, toValidEan13 as utilsToValidEan13 } from '../../lib/barcodeUtils';
+import {
+  renderBarcodeToSvg,
+  toValidEan13 as utilsToValidEan13,
+} from '../../lib/barcodeUtils';
 import { X, Printer, Minus, Plus } from 'lucide-react';
 
-const STICKER_CONFIG = {
+/**
+ * ============================================================
+ * PRINT CONFIGURATION
+ * ============================================================
+ *
+ * IMPORTANT:
+ *
+ * Thermal/Xprinter:
+ *   Physical sticker = 38mm × 25mm
+ *
+ * A4:
+ *   Physical sticker = 40mm × 27mm
+ *   Sheet = 210mm × 297mm
+ *   Grid = 4 columns × 8 rows
+ *
+ * These two configurations are intentionally kept separate.
+ */
+
+/**
+ * ============================================================
+ * THERMAL / XPRINTER CONFIG
+ * ============================================================
+ *
+ * Xprinter XP-365B
+ * Physical sticker roll:
+ *   Width  = 38mm
+ *   Height = 25mm
+ *
+ * The 80mm printer path is NOT used as the PDF/page width.
+ * The actual label/page width is 38mm.
+ */
+const THERMAL_CONFIG = {
+  pageWidthMm: 38,
+  pageHeightMm: 25,
+
+  stickerWidthMm: 38,
+  stickerHeightMm: 25,
+
+  /**
+   * Safe content margins.
+   *
+   * Physical sticker is 38mm wide.
+   * Content area = 36mm.
+   */
+  marginLeftMm: 1.0,
+  marginRightMm: 1.0,
+  marginTopMm: 0.5,
+  marginBottomMm: 0.5,
+
+  companyNameHeightMm: 1.8,
+
+  productNameBaseHeightMm: 1.9,
+  productNameMaxLines: 2,
+
+  priceHeightMm: 2.6,
+
+  /**
+   * Barcode number area.
+   */
+  barcodeNumberHeightMm: 2.8,
+
+  /**
+   * Small vertical gaps to maximize usable sticker area.
+   */
+  gapMm: 0.2,
+
+  /**
+   * 35mm barcode inside 36mm content area.
+   *
+   * Do NOT use 37mm here because the content width is only 36mm.
+   */
+  barcodeWidthMm: 35.0,
+
+  barcodeMinHeightMm: 9.0,
+  barcodeMaxHeightMm: 11.5,
+
+  companyNameFontSizePt: 5.5,
+  productNameFontSizePt: 5.5,
+  productNameFontSizeSmallPt: 5.0,
+  priceFontSizePt: 8.0,
+  barcodeNumberFontSizePt: 8.0,
+} as const;
+
+/**
+ * ============================================================
+ * A4 STICKER CONFIG
+ * ============================================================
+ */
+const A4_STICKER_CONFIG = {
   stickerWidthMm: 40,
   stickerHeightMm: 27,
-  mediaWidthMm: 80,
+
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
   marginTopMm: 0.8,
   marginBottomMm: 0.8,
 
   companyNameHeightMm: 1.8,
+
   productNameBaseHeightMm: 1.9,
   productNameMaxLines: 2,
+
   priceHeightMm: 2.6,
+
   barcodeNumberHeightMm: 3.2,
 
   gapMm: 0.3,
@@ -29,28 +123,63 @@ const STICKER_CONFIG = {
   productNameFontSizePt: 5.5,
   productNameFontSizeSmallPt: 5.0,
   priceFontSizePt: 8.0,
-  barcodeNumberFontSizePt: 9,
+  barcodeNumberFontSizePt: 9.0,
 } as const;
 
+/**
+ * ============================================================
+ * A4 GRID CONFIG
+ * ============================================================
+ */
 const A4_GRID_CONFIG = {
   pageWidthMm: 210,
   pageHeightMm: 297,
+
   columns: 4,
   rows: 8,
+
   marginXMm: 9,
   marginYMm: 6.5,
+
   horizontalGapMm: 10,
   verticalGapMm: 9,
+
   showBorder: true,
 } as const;
 
 type PrintMode = 'thermal' | 'a4grid';
 
+type StickerConfig =
+  | typeof THERMAL_CONFIG
+  | typeof A4_STICKER_CONFIG;
+
+/**
+ * Convert number to CSS mm.
+ */
 function mm(n: number): string {
   return `${n.toFixed(3)}mm`;
 }
 
-function calculateLayout(productNameStr: string) {
+/**
+ * ============================================================
+ * GET ACTIVE STICKER CONFIG
+ * ============================================================
+ */
+function getStickerConfig(mode: PrintMode): StickerConfig {
+  return mode === 'thermal'
+    ? THERMAL_CONFIG
+    : A4_STICKER_CONFIG;
+}
+
+/**
+ * ============================================================
+ * CALCULATE STICKER CONTENT LAYOUT
+ * ============================================================
+ */
+function calculateLayout(
+  productNameStr: string,
+  config: StickerConfig
+) {
   const {
     stickerWidthMm,
     stickerHeightMm,
@@ -67,18 +196,46 @@ function calculateLayout(productNameStr: string) {
     barcodeWidthMm,
     barcodeMinHeightMm,
     barcodeMaxHeightMm,
-  } = STICKER_CONFIG;
+  } = config;
 
-  const contentWidthMm = stickerWidthMm - marginLeftMm - marginRightMm;
-  const contentHeightMm = stickerHeightMm - marginTopMm - marginBottomMm;
+  const contentWidthMm =
+    stickerWidthMm -
+    marginLeftMm -
+    marginRightMm;
 
-  const nameLength = productNameStr.length;
+  const contentHeightMm =
+    stickerHeightMm -
+    marginTopMm -
+    marginBottomMm;
+
+  /**
+   * Determine product name lines.
+   */
+  const nameLength = productNameStr.trim().length;
+
   let productNameLines = 1;
-  if (nameLength > 20) productNameLines = 2;
-  productNameLines = Math.min(productNameLines, productNameMaxLines);
 
-  const productNameHeightMm = productNameBaseHeightMm * productNameLines;
+  if (nameLength > 20) {
+    productNameLines = 2;
+  }
 
+  productNameLines = Math.min(
+    productNameLines,
+    productNameMaxLines
+  );
+
+  const productNameHeightMm =
+    productNameBaseHeightMm * productNameLines;
+
+  /**
+   * Four small vertical gaps:
+   *
+   * Company
+   * Product
+   * Price
+   * Barcode
+   * Barcode number
+   */
   const fixedGaps = gapMm * 4;
 
   const fixedElementsHeightMm =
@@ -88,20 +245,46 @@ function calculateLayout(productNameStr: string) {
     barcodeNumberHeightMm +
     fixedGaps;
 
-  let barcodeHeightMm = contentHeightMm - fixedElementsHeightMm;
-  barcodeHeightMm = Math.max(barcodeHeightMm, barcodeMinHeightMm);
-  barcodeHeightMm = Math.min(barcodeHeightMm, barcodeMaxHeightMm);
+  /**
+   * Remaining space goes to barcode.
+   */
+  let barcodeHeightMm =
+    contentHeightMm -
+    fixedElementsHeightMm;
+
+  barcodeHeightMm = Math.max(
+    barcodeHeightMm,
+    barcodeMinHeightMm
+  );
+
+  barcodeHeightMm = Math.min(
+    barcodeHeightMm,
+    barcodeMaxHeightMm
+  );
+
+  /**
+   * ============================================================
+   * VERTICAL LAYOUT
+   * ============================================================
+   */
 
   let yCursor = marginTopMm;
 
+  /**
+   * Company name
+   */
   const companyName = {
     x: marginLeftMm,
     y: yCursor,
     width: contentWidthMm,
     height: companyNameHeightMm,
   };
+
   yCursor += companyNameHeightMm + gapMm;
 
+  /**
+   * Product name
+   */
   const productName = {
     x: marginLeftMm,
     y: yCursor,
@@ -109,25 +292,40 @@ function calculateLayout(productNameStr: string) {
     height: productNameHeightMm,
     lines: productNameLines,
   };
+
   yCursor += productNameHeightMm + gapMm;
 
+  /**
+   * Price
+   */
   const price = {
     x: marginLeftMm,
     y: yCursor,
     width: contentWidthMm,
     height: priceHeightMm,
   };
+
   yCursor += priceHeightMm + gapMm;
 
-  const barcodeX = marginLeftMm + (contentWidthMm - barcodeWidthMm) / 2;
+  /**
+   * Barcode centered horizontally.
+   */
+  const barcodeX =
+    marginLeftMm +
+    (contentWidthMm - barcodeWidthMm) / 2;
+
   const barcode = {
     x: barcodeX,
     y: yCursor,
     width: barcodeWidthMm,
     height: barcodeHeightMm,
   };
+
   yCursor += barcodeHeightMm + gapMm;
 
+  /**
+   * Barcode number
+   */
   const barcodeNumber = {
     x: marginLeftMm,
     y: yCursor,
@@ -140,6 +338,7 @@ function calculateLayout(productNameStr: string) {
     stickerHeightMm,
     contentWidthMm,
     contentHeightMm,
+
     companyName,
     productName,
     price,
@@ -148,92 +347,342 @@ function calculateLayout(productNameStr: string) {
   };
 }
 
+/**
+ * ============================================================
+ * A4 GRID POSITION
+ * ============================================================
+ *
+ * COLUMN-MAJOR
+ *
+ * Required order:
+ *
+ * [ 1  9 17 25 ]
+ * [ 2 10 18 26 ]
+ * [ 3 11 19 27 ]
+ * [ 4 12 20 28 ]
+ * [ 5 13 21 29 ]
+ * [ 6 14 22 30 ]
+ * [ 7 15 23 31 ]
+ * [ 8 16 24 32 ]
+ *
+ * This is vertical-first / column-major.
+ */
 function getGridPosition(
   stickerIndex: number
-): { page: number; row: number; col: number; xMm: number; yMm: number } {
-  const { columns, rows, marginXMm, marginYMm, horizontalGapMm, verticalGapMm } =
-    A4_GRID_CONFIG;
-  const { stickerWidthMm, stickerHeightMm } = STICKER_CONFIG;
-  const stickersPerPage = columns * rows;
+): {
+  page: number;
+  row: number;
+  col: number;
+  xMm: number;
+  yMm: number;
+} {
+  const {
+    columns,
+    rows,
+    marginXMm,
+    marginYMm,
+    horizontalGapMm,
+    verticalGapMm,
+  } = A4_GRID_CONFIG;
 
-  const page = Math.floor(stickerIndex / stickersPerPage);
-  const indexOnPage = stickerIndex % stickersPerPage;
-  const row = Math.floor(indexOnPage / columns);
-  const col = indexOnPage % columns;
+  const {
+    stickerWidthMm,
+    stickerHeightMm,
+  } = A4_STICKER_CONFIG;
 
-  const xMm = marginXMm + col * (stickerWidthMm + horizontalGapMm);
-  const yMm = marginYMm + row * (stickerHeightMm + verticalGapMm);
+  const stickersPerPage =
+    columns * rows;
 
-  return { page, row, col, xMm, yMm };
+  const page =
+    Math.floor(
+      stickerIndex / stickersPerPage
+    );
+
+  const indexOnPage =
+    stickerIndex % stickersPerPage;
+
+  /**
+   * COLUMN-MAJOR
+   *
+   * Column changes after `rows` stickers.
+   */
+  const col =
+    Math.floor(indexOnPage / rows);
+
+  const row =
+    indexOnPage % rows;
+
+  const xMm =
+    marginXMm +
+    col *
+      (stickerWidthMm +
+        horizontalGapMm);
+
+  const yMm =
+    marginYMm +
+    row *
+      (stickerHeightMm +
+        verticalGapMm);
+
+  return {
+    page,
+    row,
+    col,
+    xMm,
+    yMm,
+  };
 }
 
+/**
+ * ============================================================
+ * COMPONENT PROPS
+ * ============================================================
+ */
 export interface BarcodeStickerPrintProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product | null;
 }
 
-export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
+/**
+ * ============================================================
+ * MAIN COMPONENT
+ * ============================================================
+ */
+export function BarcodeStickerPrint({
+  isOpen,
+  onClose,
+  product,
+}: BarcodeStickerPrintProps) {
   const { state } = useApp();
-  const [copies, setCopies] = useState(1);
-  const [mode, setMode] = useState<PrintMode>('thermal');
 
-  const companyName = state.settings.storeName || '';
-  const productName = product?.name || '';
-  const priceValue = product?.price ?? 0;
-  const barcodeValue = product?.barcode || '';
-  const currency = state.settings.currency || 'Rs.';
+  const [copies, setCopies] =
+    useState(1);
 
-  const layout = useMemo(() => calculateLayout(productName), [productName]);
+  const [mode, setMode] =
+    useState<PrintMode>('thermal');
 
-  const priceFontSize = layout.price.height / 3.6 * STICKER_CONFIG.priceFontSizePt;
-  const productNameFontSize = layout.productName.lines >= 2 || productName.length > 22
-    ? STICKER_CONFIG.productNameFontSizeSmallPt
-    : STICKER_CONFIG.productNameFontSizePt;
+  /**
+   * ============================================================
+   * PRODUCT DATA
+   * ============================================================
+   */
+  const companyName =
+    state.settings.storeName || '';
 
-  const stickersPerPage = A4_GRID_CONFIG.columns * A4_GRID_CONFIG.rows;
+  const productName =
+    product?.name || '';
+
+  const priceValue =
+    product?.price ?? 0;
+
+  const barcodeValue =
+    product?.barcode || '';
+
+  const currency =
+    state.settings.currency || 'Rs.';
+
+  /**
+   * ============================================================
+   * ACTIVE CONFIG
+   * ============================================================
+   */
+  const stickerConfig =
+    useMemo(
+      () => getStickerConfig(mode),
+      [mode]
+    );
+
+  /**
+   * ============================================================
+   * ACTIVE STICKER LAYOUT
+   * ============================================================
+   */
+  const layout =
+    useMemo(
+      () =>
+        calculateLayout(
+          productName,
+          stickerConfig
+        ),
+      [
+        productName,
+        stickerConfig,
+      ]
+    );
+
+  /**
+   * Price font size.
+   */
+  const priceFontSize =
+    (layout.price.height / 3.6) *
+    stickerConfig.priceFontSizePt;
+
+  /**
+   * Product name font size.
+   */
+  const productNameFontSize =
+    layout.productName.lines >= 2 ||
+    productName.length > 22
+      ? stickerConfig.productNameFontSizeSmallPt
+      : stickerConfig.productNameFontSizePt;
+
+  /**
+   * ============================================================
+   * A4 PAGE CALCULATIONS
+   * ============================================================
+   */
+  const stickersPerPage =
+    A4_GRID_CONFIG.columns *
+    A4_GRID_CONFIG.rows;
+
   const totalPages =
-    mode === 'a4grid' ? Math.ceil(copies / stickersPerPage) : copies;
+    mode === 'a4grid'
+      ? Math.ceil(
+          copies / stickersPerPage
+        )
+      : copies;
 
+  /**
+   * ============================================================
+   * PRINT HANDLER
+   * ============================================================
+   */
   const handlePrint = () => {
     setTimeout(() => {
-      const stickerEl = document.getElementById('barcode-sticker-sheet');
-      if (!stickerEl) return;
+      const stickerEl =
+        document.getElementById(
+          'barcode-sticker-sheet'
+        );
 
-      const clone = stickerEl.cloneNode(true) as HTMLElement;
-      clone.id = 'barcode-sticker-print-root';
-      clone.style.position = 'absolute';
-      clone.style.left = '0';
-      clone.style.top = '0';
-      clone.style.zIndex = '999999';
-      clone.style.background = '#ffffff';
-      clone.style.display = 'block';
-      clone.style.visibility = 'visible';
+      if (!stickerEl) {
+        console.error(
+          'Barcode sticker print root not found.'
+        );
+        return;
+      }
 
-      const bodyChildren = Array.from(document.body.children) as HTMLElement[];
-      bodyChildren.forEach((c) => c.classList.add('print-body-hidden'));
+      /**
+       * Clone print content.
+       */
+      const clone =
+        stickerEl.cloneNode(
+          true
+        ) as HTMLElement;
 
-      document.body.appendChild(clone);
-      clone.classList.add('print-body-visible');
-      clone.setAttribute('data-print-mode', mode);
+      clone.id =
+        'barcode-sticker-print-root';
 
+      /**
+       * Set print root properties.
+       */
+      clone.style.position =
+        'absolute';
+
+      clone.style.left =
+        '0';
+
+      clone.style.top =
+        '0';
+
+      clone.style.zIndex =
+        '999999';
+
+      clone.style.background =
+        '#ffffff';
+
+      clone.style.display =
+        'block';
+
+      clone.style.visibility =
+        'visible';
+
+      clone.style.margin =
+        '0';
+
+      clone.style.padding =
+        '0';
+
+      clone.style.boxSizing =
+        'border-box';
+
+      /**
+       * Hide existing application.
+       */
+      const bodyChildren =
+        Array.from(
+          document.body.children
+        ) as HTMLElement[];
+
+      bodyChildren.forEach(
+        (child) => {
+          child.classList.add(
+            'print-body-hidden'
+          );
+        }
+      );
+
+      /**
+       * Add cloned print root.
+       */
+      document.body.appendChild(
+        clone
+      );
+
+      clone.classList.add(
+        'print-body-visible'
+      );
+
+      clone.setAttribute(
+        'data-print-mode',
+        mode
+      );
+
+      /**
+       * Trigger browser print.
+       */
       window.print();
 
+      /**
+       * Clean up after printing.
+       */
       setTimeout(() => {
         clone.remove();
-        bodyChildren.forEach((c) => c.classList.remove('print-body-hidden'));
-      }, 300);
-    }, 120);
+
+        bodyChildren.forEach(
+          (child) => {
+            child.classList.remove(
+              'print-body-hidden'
+            );
+          }
+        );
+      }, 500);
+    }, 150);
   };
 
-  const formatPrice = (n: number) => {
-    return `${currency}. ${n.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+  /**
+   * ============================================================
+   * FORMAT PRICE
+   * ============================================================
+   */
+  const formatPrice = (
+    n: number
+  ) => {
+    return `${currency}. ${n.toLocaleString(
+      'en-US',
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }
+    )}`;
   };
 
-  if (!isOpen || !product) return null;
+  /**
+   * Do not render if closed/no product.
+   */
+  if (!isOpen || !product) {
+    return null;
+  }
 
   const {
     stickerWidthMm,
@@ -245,65 +694,168 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     barcodeNumber: bn,
   } = layout;
 
+  /**
+   * ============================================================
+   * STICKER CONTENT PROPS
+   * ============================================================
+   */
   const stickerContentProps = {
     companyName,
     productName,
-    priceText: formatPrice(priceValue),
+    priceText:
+      formatPrice(priceValue),
+
     barcodeValue,
-    barcodeNumberFontSize: STICKER_CONFIG.barcodeNumberFontSizePt,
-    companyNameFontSize: STICKER_CONFIG.companyNameFontSizePt,
+
+    barcodeNumberFontSize:
+      stickerConfig.barcodeNumberFontSizePt,
+
+    companyNameFontSize:
+      stickerConfig.companyNameFontSizePt,
+
     productNameFontSize,
+
     priceFontSize,
+
     cn,
     pn,
     pr,
     bc,
     bn,
-    showBorder: mode === 'a4grid' && A4_GRID_CONFIG.showBorder,
+
+    showBorder:
+      mode === 'a4grid' &&
+      A4_GRID_CONFIG.showBorder,
   };
 
+  /**
+   * ============================================================
+   * THERMAL SHEET
+   * ============================================================
+   *
+   * Every sticker is exactly:
+   *
+   * 38mm × 25mm
+   *
+   * One sticker per page.
+   */
   const renderThermalSheet = () =>
-    Array.from({ length: copies }).map((_, i) => (
+    Array.from(
+      { length: copies }
+    ).map((_, i) => (
       <div
         key={`thermal-${i}`}
         style={{
-          width: mm(stickerWidthMm),
-          height: mm(stickerHeightMm),
+          width: '38mm',
+          height: '25mm',
+
           position: 'relative',
-          pageBreakAfter: i < copies - 1 ? 'always' : 'auto',
+
+          pageBreakAfter:
+            i < copies - 1
+              ? 'always'
+              : 'auto',
+
+          breakAfter:
+            i < copies - 1
+              ? 'page'
+              : 'auto',
+
           overflow: 'hidden',
+
           background: '#ffffff',
+
+          margin: 0,
+          padding: 0,
+
+          boxSizing:
+            'border-box',
         }}
       >
-        <StickerContent key={`s-${i}`} {...stickerContentProps} stickerKey={`t-${i}`} />
+        <StickerContent
+          {...stickerContentProps}
+          stickerKey={`t-${i}`}
+          showBorder={false}
+        />
       </div>
     ));
 
+  /**
+   * ============================================================
+   * A4 GRID SHEET
+   * ============================================================
+   */
   const renderA4GridSheet = () => {
-    const pages: JSX.Element[] = [];
-    for (let p = 0; p < totalPages; p++) {
-      const startIdx = p * stickersPerPage;
-      const endIdx = Math.min(startIdx + stickersPerPage, copies);
-      const stickersOnPage: JSX.Element[] = [];
+    const pages: JSX.Element[] =
+      [];
 
-      for (let s = startIdx; s < endIdx; s++) {
-        const { xMm, yMm } = getGridPosition(s);
+    for (
+      let p = 0;
+      p < totalPages;
+      p++
+    ) {
+      const startIdx =
+        p * stickersPerPage;
+
+      const endIdx =
+        Math.min(
+          startIdx +
+            stickersPerPage,
+          copies
+        );
+
+      const stickersOnPage:
+        JSX.Element[] = [];
+
+      for (
+        let s = startIdx;
+        s < endIdx;
+        s++
+      ) {
+        const {
+          xMm,
+          yMm,
+        } =
+          getGridPosition(s);
+
         stickersOnPage.push(
           <div
             key={`sticker-${s}`}
             style={{
-              position: 'absolute',
+              position:
+                'absolute',
+
               left: mm(xMm),
               top: mm(yMm),
-              width: mm(stickerWidthMm),
-              height: mm(stickerHeightMm),
-              overflow: 'hidden',
-              background: '#ffffff',
-              border: A4_GRID_CONFIG.showBorder ? '0.2mm solid #d1d5db' : 'none',
-              boxSizing: 'border-box',
+
+              width: mm(
+                A4_STICKER_CONFIG.stickerWidthMm
+              ),
+
+              height: mm(
+                A4_STICKER_CONFIG.stickerHeightMm
+              ),
+
+              overflow:
+                'hidden',
+
+              background:
+                '#ffffff',
+
+              border:
+                A4_GRID_CONFIG.showBorder
+                  ? '0.2mm solid #d1d5db'
+                  : 'none',
+
+              boxSizing:
+                'border-box',
             }}
           >
-            <StickerContent {...stickerContentProps} stickerKey={`a4-${s}`} showBorder={false} />
+            <StickerContent
+              {...stickerContentProps}
+              stickerKey={`a4-${s}`}
+              showBorder={false}
+            />
           </div>
         );
       }
@@ -312,66 +864,195 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         <div
           key={`page-${p}`}
           style={{
-            width: mm(A4_GRID_CONFIG.pageWidthMm),
-            height: mm(A4_GRID_CONFIG.pageHeightMm),
-            position: 'relative',
-            pageBreakAfter: p < totalPages - 1 ? 'always' : 'auto',
-            overflow: 'hidden',
-            background: '#ffffff',
-            boxSizing: 'border-box',
+            width:
+              mm(
+                A4_GRID_CONFIG.pageWidthMm
+              ),
+
+            height:
+              mm(
+                A4_GRID_CONFIG.pageHeightMm
+              ),
+
+            position:
+              'relative',
+
+            pageBreakAfter:
+              p <
+              totalPages - 1
+                ? 'always'
+                : 'auto',
+
+            breakAfter:
+              p <
+              totalPages - 1
+                ? 'page'
+                : 'auto',
+
+            overflow:
+              'hidden',
+
+            background:
+              '#ffffff',
+
+            boxSizing:
+              'border-box',
+
+            margin: 0,
+            padding: 0,
           }}
         >
           {stickersOnPage}
         </div>
       );
     }
+
     return pages;
   };
 
+  /**
+   * ============================================================
+   * PREVIEW
+   * ============================================================
+   */
   const renderPreview = () => {
+    /**
+     * ----------------------------------------------------------
+     * THERMAL PREVIEW
+     * ----------------------------------------------------------
+     */
     if (mode === 'thermal') {
+      const pxPerMm =
+        3.7795275591;
+
       return (
         <div
           style={{
-            width: `${stickerWidthMm * 3.7795275591}px`,
-            height: `${stickerHeightMm * 3.7795275591}px`,
-            border: '1px dashed #9ca3af',
-            position: 'relative',
-            background: '#ffffff',
+            width:
+              `${THERMAL_CONFIG.stickerWidthMm * pxPerMm}px`,
+
+            height:
+              `${THERMAL_CONFIG.stickerHeightMm * pxPerMm}px`,
+
+            border:
+              '1px dashed #9ca3af',
+
+            position:
+              'relative',
+
+            background:
+              '#ffffff',
+
             flexShrink: 0,
+
+            boxSizing:
+              'border-box',
+
+            overflow:
+              'hidden',
           }}
         >
-          <StickerContent {...stickerContentProps} stickerKey="pv-thermal" />
+          <StickerContent
+            {...stickerContentProps}
+            stickerKey="pv-thermal"
+            showBorder={false}
+          />
         </div>
       );
     }
 
+    /**
+     * ----------------------------------------------------------
+     * A4 PREVIEW
+     * ----------------------------------------------------------
+     */
     const previewScale = 2.2;
-    const pageW = A4_GRID_CONFIG.pageWidthMm * previewScale;
-    const pageH = A4_GRID_CONFIG.pageHeightMm * previewScale;
-    const firstPageStickers = Math.min(copies, stickersPerPage);
-    const previewStickers: JSX.Element[] = [];
 
-    for (let s = 0; s < firstPageStickers; s++) {
-      const { xMm, yMm } = getGridPosition(s);
+    const pageW =
+      A4_GRID_CONFIG.pageWidthMm *
+      previewScale;
+
+    const pageH =
+      A4_GRID_CONFIG.pageHeightMm *
+      previewScale;
+
+    const firstPageStickers =
+      Math.min(
+        copies,
+        stickersPerPage
+      );
+
+    const previewStickers:
+      JSX.Element[] = [];
+
+    for (
+      let s = 0;
+      s < firstPageStickers;
+      s++
+    ) {
+      const {
+        xMm,
+        yMm,
+      } =
+        getGridPosition(s);
+
       previewStickers.push(
         <div
           key={`pv-${s}`}
           style={{
-            position: 'absolute',
-            left: `${xMm * previewScale}px`,
-            top: `${yMm * previewScale}px`,
-            width: `${stickerWidthMm * previewScale}px`,
-            height: `${stickerHeightMm * previewScale}px`,
-            border: A4_GRID_CONFIG.showBorder ? '0.5px solid #d1d5db' : '1px dashed #9ca3af',
-            background: '#ffffff',
-            boxSizing: 'border-box',
-            transform: `scale(1)`,
-            transformOrigin: 'top left',
+            position:
+              'absolute',
+
+            left:
+              `${xMm * previewScale}px`,
+
+            top:
+              `${yMm * previewScale}px`,
+
+            width:
+              `${A4_STICKER_CONFIG.stickerWidthMm * previewScale}px`,
+
+            height:
+              `${A4_STICKER_CONFIG.stickerHeightMm * previewScale}px`,
+
+            border:
+              A4_GRID_CONFIG.showBorder
+                ? '0.5px solid #d1d5db'
+                : '1px dashed #9ca3af',
+
+            background:
+              '#ffffff',
+
+            boxSizing:
+              'border-box',
+
+            overflow:
+              'hidden',
           }}
         >
-          <div style={{ transform: `scale(${previewScale / 3.7795275591})`, transformOrigin: 'top left', width: `${stickerWidthMm * 3.7795275591}px`, height: `${stickerHeightMm * 3.7795275591}px`, position: 'relative' }}>
-            <StickerContent {...stickerContentProps} stickerKey={`pv-s-${s}`} showBorder={false} />
+          <div
+            style={{
+              transform:
+                `scale(${previewScale / 3.7795275591})`,
+
+              transformOrigin:
+                'top left',
+
+              width:
+                `${A4_STICKER_CONFIG.stickerWidthMm * 3.7795275591}px`,
+
+              height:
+                `${A4_STICKER_CONFIG.stickerHeightMm * 3.7795275591}px`,
+
+              position:
+                'relative',
+            }}
+          >
+            <StickerContent
+              {...stickerContentProps}
+              stickerKey={`pv-s-${s}`}
+              showBorder={false}
+            />
           </div>
         </div>
       );
@@ -380,13 +1061,28 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     return (
       <div
         style={{
-          width: `${pageW}px`,
-          height: `${pageH}px`,
-          position: 'relative',
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          width:
+            `${pageW}px`,
+
+          height:
+            `${pageH}px`,
+
+          position:
+            'relative',
+
+          background:
+            '#ffffff',
+
+          border:
+            '1px solid #e5e7eb',
+
+          boxShadow:
+            '0 1px 3px rgba(0,0,0,0.05)',
+
           flexShrink: 0,
+
+          overflow:
+            'hidden',
         }}
       >
         {previewStickers}
@@ -394,11 +1090,23 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
     );
   };
 
+  /**
+   * ============================================================
+   * RENDER
+   * ============================================================
+   */
   return (
     <div className="modal-overlay">
       <div className="modal max-w-3xl">
+
+        {/* ======================================================
+            HEADER
+        ====================================================== */}
         <div className="modal-header no-print">
-          <h2 className="text-xl font-bold text-gray-900">Print Barcode Sticker</h2>
+          <h2 className="text-xl font-bold text-gray-900">
+            Print Barcode Sticker
+          </h2>
+
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100"
@@ -407,38 +1115,85 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
           </button>
         </div>
 
+        {/* ======================================================
+            BODY
+        ====================================================== */}
         <div className="modal-body space-y-6">
+
+          {/* ====================================================
+              PRODUCT + MODE
+          ==================================================== */}
           <div className="no-print grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            {/* PRODUCT INFO */}
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Sticker Info</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                Sticker Info
+              </h3>
+
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Product:</span>
-                  <span className="font-medium text-gray-900">{productName}</span>
+
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500">
+                    Product:
+                  </span>
+
+                  <span className="font-medium text-gray-900 text-right">
+                    {productName}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">SKU:</span>
-                  <span className="font-mono text-gray-900">{product.sku}</span>
+
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500">
+                    SKU:
+                  </span>
+
+                  <span className="font-mono text-gray-900">
+                    {product.sku}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Barcode:</span>
-                  <span className="font-mono text-gray-900">{barcodeValue}</span>
+
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500">
+                    Barcode:
+                  </span>
+
+                  <span className="font-mono text-gray-900">
+                    {barcodeValue}
+                  </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Price:</span>
-                  <span className="font-semibold text-gray-900">{formatPrice(priceValue)}</span>
+
+                <div className="flex justify-between gap-3">
+                  <span className="text-gray-500">
+                    Price:
+                  </span>
+
+                  <span className="font-semibold text-gray-900">
+                    {formatPrice(
+                      priceValue
+                    )}
+                  </span>
                 </div>
+
               </div>
             </div>
 
+            {/* PRINT OPTIONS */}
             <div className="space-y-4">
+
+              {/* PRINT MODE */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Print Mode
                 </label>
+
                 <div className="grid grid-cols-2 gap-2">
+
+                  {/* THERMAL */}
                   <button
-                    onClick={() => setMode('thermal')}
+                    onClick={() =>
+                      setMode('thermal')
+                    }
                     className={`px-3 py-2 rounded-lg text-sm font-medium border-2 transition ${
                       mode === 'thermal'
                         ? 'border-primary-500 bg-primary-50 text-primary-700'
@@ -446,12 +1201,17 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                     }`}
                   >
                     🖨️ Thermal Roll
+
                     <div className="text-xs font-normal mt-0.5 opacity-80">
                       38×25mm · Xprinter
                     </div>
                   </button>
+
+                  {/* A4 */}
                   <button
-                    onClick={() => setMode('a4grid')}
+                    onClick={() =>
+                      setMode('a4grid')
+                    }
                     className={`px-3 py-2 rounded-lg text-sm font-medium border-2 transition ${
                       mode === 'a4grid'
                         ? 'border-primary-500 bg-primary-50 text-primary-700'
@@ -459,344 +1219,971 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
                     }`}
                   >
                     📄 A4 Sheet Grid
+
                     <div className="text-xs font-normal mt-0.5 opacity-80">
                       4×8 = {stickersPerPage}/page
                     </div>
                   </button>
+
                 </div>
               </div>
 
+              {/* NUMBER OF STICKERS */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Number of Stickers
                 </label>
+
                 <div className="flex items-center space-x-3">
+
                   <button
-                    onClick={() => setCopies((c) => Math.max(1, c - 1))}
+                    onClick={() =>
+                      setCopies(
+                        (c) =>
+                          Math.max(
+                            1,
+                            c - 1
+                          )
+                      )
+                    }
                     className="btn btn-secondary btn-md"
                     disabled={copies <= 1}
                   >
                     <Minus className="h-4 w-4" />
                   </button>
+
                   <span className="text-lg font-bold text-gray-900 w-16 text-center">
                     {copies}
                   </span>
+
                   <button
-                    onClick={() => setCopies((c) => Math.min(500, c + 1))}
+                    onClick={() =>
+                      setCopies(
+                        (c) =>
+                          Math.min(
+                            500,
+                            c + 1
+                          )
+                      )
+                    }
                     className="btn btn-secondary btn-md"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
+
                   <button
-                    onClick={() => setCopies(32)}
+                    onClick={() =>
+                      setCopies(32)
+                    }
                     className="btn btn-secondary btn-sm text-xs"
                   >
                     32
                   </button>
+
                   <button
-                    onClick={() => setCopies(stickersPerPage)}
+                    onClick={() =>
+                      setCopies(
+                        stickersPerPage
+                      )
+                    }
                     className="btn btn-secondary btn-sm text-xs"
                   >
                     Full Sheet
                   </button>
+
                 </div>
+
                 <p className="text-xs text-gray-500 mt-2">
+
                   {mode === 'thermal'
-                    ? `Sticker: ${stickerWidthMm}×${stickerHeightMm}mm · Left-aligned on 80mm media`
-                    : `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Gaps: ${A4_GRID_CONFIG.horizontalGapMm}/${A4_GRID_CONFIG.verticalGapMm}mm`}
-                  {mode === 'a4grid' && copies > 0 && (
-                    <span className="ml-2 font-medium">
-                      · Pages: {totalPages}
-                    </span>
-                  )}
+                    ? `Sticker: ${THERMAL_CONFIG.stickerWidthMm}×${THERMAL_CONFIG.stickerHeightMm}mm · Left-aligned on 80mm printer path`
+                    : `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Column-major`}
+
+                  {mode === 'a4grid' &&
+                    copies > 0 && (
+                      <span className="ml-2 font-medium">
+                        · Pages:{' '}
+                        {totalPages}
+                      </span>
+                    )}
+
                 </p>
               </div>
+
             </div>
           </div>
 
+          {/* ====================================================
+              PREVIEW
+          ==================================================== */}
           <div className="no-print">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Preview</h3>
+
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">
+              Preview
+            </h3>
+
             <div className="flex justify-center p-6 bg-gray-100 rounded-2xl border border-gray-200 overflow-auto">
               {renderPreview()}
             </div>
+
           </div>
+
         </div>
 
-        <div id="barcode-sticker-sheet" style={{ display: 'none' }}>
-          {mode === 'thermal' ? renderThermalSheet() : renderA4GridSheet()}
+        {/* ======================================================
+            HIDDEN PRINT CONTENT
+        ====================================================== */}
+        <div
+          id="barcode-sticker-sheet"
+          style={{
+            display: 'none',
+          }}
+        >
+          {mode === 'thermal'
+            ? renderThermalSheet()
+            : renderA4GridSheet()}
         </div>
 
+        {/* ======================================================
+            FOOTER
+        ====================================================== */}
         <div className="modal-footer no-print">
-          <button onClick={onClose} className="btn btn-secondary btn-md">
+
+          <button
+            onClick={onClose}
+            className="btn btn-secondary btn-md"
+          >
             Close
           </button>
+
           <button
             onClick={handlePrint}
             className="btn btn-primary btn-md"
             disabled={!barcodeValue}
           >
             <Printer className="h-4 w-4 mr-2" />
-            Print {copies > 1 ? `${copies} Stickers` : 'Sticker'}
-            {mode === 'a4grid' && totalPages > 1 && ` · ${totalPages} Pages`}
+
+            Print{' '}
+
+            {copies > 1
+              ? `${copies} Stickers`
+              : 'Sticker'}
+
+            {mode === 'a4grid' &&
+              totalPages > 1 &&
+              ` · ${totalPages} Pages`}
           </button>
+
         </div>
 
+        {/* ======================================================
+            PRINT CSS
+        ====================================================== */}
         <style>{`
-          @media print {
-            @page {
-              margin: 0mm;
-            }
 
-            html, body {
+          /* ====================================================
+             GLOBAL PRINT PAGE DEFINITIONS
+          ==================================================== */
+
+          @page {
+            margin: 0;
+          }
+
+          /*
+           * Thermal page.
+           *
+           * EXACT:
+           * 38mm × 25mm
+           */
+          @page thermal {
+            size: 38mm 25mm;
+            margin: 0;
+          }
+
+          /*
+           * A4 page.
+           */
+          @page a4grid {
+            size: A4 portrait;
+            margin: 0;
+          }
+
+
+          /* ====================================================
+             PRINT MEDIA
+          ==================================================== */
+
+          @media print {
+
+            html,
+            body {
               margin: 0 !important;
               padding: 0 !important;
+
+              width: auto !important;
+              height: auto !important;
+
               background: #ffffff !important;
+
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
 
-            .no-print { display: none !important; }
-            .print-body-hidden { display: none !important; }
+
+            /*
+             * Hide application UI.
+             */
+            .no-print {
+              display: none !important;
+            }
+
+
+            /*
+             * Hide all existing body children.
+             */
+            .print-body-hidden {
+              display: none !important;
+            }
+
+
+            /*
+             * Show cloned print root.
+             */
             .print-body-visible {
               display: block !important;
               visibility: visible !important;
             }
 
+
+            /* ==================================================
+               IMPORTANT:
+               DO NOT FORCE display:block on ALL CHILDREN.
+               
+               The old code had:
+               
+               #barcode-sticker-print-root * {
+                 display:block !important;
+               }
+               
+               That breaks flex alignment inside StickerContent.
+               ================================================== */
+
             #barcode-sticker-print-root,
             #barcode-sticker-print-root * {
               visibility: visible !important;
-              display: block !important;
             }
+
+
+            /* ==================================================
+               PRINT ROOT
+            ================================================== */
 
             #barcode-sticker-print-root {
               position: absolute !important;
+
               left: 0 !important;
               top: 0 !important;
+
               margin: 0 !important;
               padding: 0 !important;
+
+              background: #ffffff !important;
+
+              box-sizing: border-box !important;
+
+              visibility: visible !important;
             }
 
-            #barcode-sticker-print-root > div {
+
+            /* ==================================================
+               THERMAL / XPRINTER
+            ================================================== */
+
+            #barcode-sticker-print-root[data-print-mode="thermal"] {
+              page: thermal !important;
+
+              width: 38mm !important;
+
               margin: 0 !important;
               padding: 0 !important;
+
               box-sizing: border-box !important;
             }
 
-            #barcode-sticker-print-root[data-print-mode="thermal"] {
-              width: ${STICKER_CONFIG.stickerWidthMm}mm !important;
+
+            /*
+             * Every thermal label.
+             */
+            #barcode-sticker-print-root[data-print-mode="thermal"] > div {
+              width: 38mm !important;
+              height: 25mm !important;
+
+              margin: 0 !important;
+              padding: 0 !important;
+
+              position: relative !important;
+
+              overflow: hidden !important;
+
+              box-sizing: border-box !important;
+
+              background: #ffffff !important;
             }
 
-            #barcode-sticker-print-root[data-print-mode="thermal"] @page {
-              size: ${STICKER_CONFIG.stickerWidthMm}mm ${STICKER_CONFIG.stickerHeightMm}mm;
+
+            /*
+             * Prevent any unexpected margins
+             * inside thermal print root.
+             */
+            #barcode-sticker-print-root[data-print-mode="thermal"] div {
+              box-sizing: border-box;
             }
+
+
+            /* ==================================================
+               A4 GRID
+            ================================================== */
 
             #barcode-sticker-print-root[data-print-mode="a4grid"] {
-              width: ${A4_GRID_CONFIG.pageWidthMm}mm !important;
+              page: a4grid !important;
+
+              width: 210mm !important;
+              height: auto !important;
+
+              margin: 0 !important;
+              padding: 0 !important;
+
+              box-sizing: border-box !important;
             }
 
-            #barcode-sticker-print-root[data-print-mode="a4grid"] @page {
-              size: A4 portrait;
+
+            /*
+             * Each A4 page.
+             */
+            #barcode-sticker-print-root[data-print-mode="a4grid"] > div {
+              width: 210mm !important;
+              height: 297mm !important;
+
+              margin: 0 !important;
+              padding: 0 !important;
+
+              position: relative !important;
+
+              overflow: hidden !important;
+
+              box-sizing: border-box !important;
+
+              background: #ffffff !important;
             }
+
+
+            /*
+             * Remove browser-added margins from
+             * direct printed children.
+             */
+            #barcode-sticker-print-root > div {
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+
+
+            /*
+             * SVG barcode must retain its dimensions.
+             */
+            #barcode-sticker-print-root svg {
+              display: block !important;
+
+              max-width: none !important;
+              max-height: none !important;
+            }
+
           }
+
         `}</style>
+
       </div>
     </div>
   );
 }
 
+
+/**
+ * ============================================================
+ * STICKER CONTENT PROPS
+ * ============================================================
+ */
 interface StickerContentProps {
   companyName: string;
   productName: string;
   priceText: string;
   barcodeValue: string;
+
   companyNameFontSize: number;
   productNameFontSize: number;
   priceFontSize: number;
   barcodeNumberFontSize: number;
-  cn: { x: number; y: number; width: number; height: number };
-  pn: { x: number; y: number; width: number; height: number; lines: number };
-  pr: { x: number; y: number; width: number; height: number };
-  bc: { x: number; y: number; width: number; height: number };
-  bn: { x: number; y: number; width: number; height: number };
+
+  cn: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+
+  pn: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    lines: number;
+  };
+
+  pr: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+
+  bc: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+
+  bn: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+
   stickerKey: string;
+
   showBorder?: boolean;
 }
 
+
+/**
+ * ============================================================
+ * STICKER CONTENT
+ * ============================================================
+ */
 function StickerContent({
   companyName,
   productName,
   priceText,
   barcodeValue,
+
   companyNameFontSize,
   productNameFontSize,
   priceFontSize,
   barcodeNumberFontSize,
+
   cn,
   pn,
   pr,
   bc,
   bn,
+
   stickerKey,
+
   showBorder = false,
 }: StickerContentProps) {
-  const inlineBarcodeSvgRef = useRef<SVGSVGElement>(null);
-  const ean13Value = useMemo(() => utilsToValidEan13(barcodeValue), [barcodeValue]);
-  const key = `${stickerKey}-${ean13Value}-${bc.width}-${bc.height}`;
 
+  const inlineBarcodeSvgRef =
+    useRef<SVGSVGElement>(null);
+
+  /**
+   * Convert barcode to valid EAN13.
+   */
+  const ean13Value =
+    useMemo(
+      () =>
+        utilsToValidEan13(
+          barcodeValue
+        ),
+      [barcodeValue]
+    );
+
+  /**
+   * Unique rendering key.
+   */
+  const key =
+    `${stickerKey}-${ean13Value}-${bc.width}-${bc.height}`;
+
+
+  /**
+   * ==========================================================
+   * RENDER BARCODE
+   * ==========================================================
+   */
   useEffect(() => {
-    if (!inlineBarcodeSvgRef.current || !ean13Value) return;
-    const svg = inlineBarcodeSvgRef.current;
-    const widthPx = (bc.width / 25.4) * 96;
-    const heightPx = (bc.height / 25.4) * 96;
-    svg.setAttribute('width', '100%');
-    svg.setAttribute('height', '100%');
-    svg.setAttribute('viewBox', `0 0 ${widthPx} ${heightPx}`);
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.innerHTML = '';
-    try {
-      renderBarcodeToSvg(svg, ean13Value, {
-        format: 'EAN13',
-        width: Math.max(1, Math.floor(widthPx / 110)),
-        height: heightPx,
-        displayValue: false,
-        margin: 0,
-        marginTop: 0,
-        marginBottom: 0,
-        marginLeft: 0,
-        marginRight: 0,
-        background: '#ffffff',
-        lineColor: '#000000',
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  }, [key, ean13Value, bc.width, bc.height]);
 
+    if (
+      !inlineBarcodeSvgRef.current ||
+      !ean13Value
+    ) {
+      return;
+    }
+
+    const svg =
+      inlineBarcodeSvgRef.current;
+
+    /**
+     * Convert mm to CSS px at 96 DPI.
+     */
+    const widthPx =
+      (bc.width / 25.4) * 96;
+
+    const heightPx =
+      (bc.height / 25.4) * 96;
+
+    /**
+     * SVG dimensions.
+     */
+    svg.setAttribute(
+      'width',
+      '100%'
+    );
+
+    svg.setAttribute(
+      'height',
+      '100%'
+    );
+
+    svg.setAttribute(
+      'viewBox',
+      `0 0 ${widthPx} ${heightPx}`
+    );
+
+    /**
+     * IMPORTANT:
+     *
+     * preserveAspectRatio="none"
+     *
+     * keeps barcode inside the exact
+     * calculated box.
+     */
+    svg.setAttribute(
+      'preserveAspectRatio',
+      'none'
+    );
+
+    /**
+     * Clear old barcode.
+     */
+    svg.innerHTML = '';
+
+    try {
+
+      renderBarcodeToSvg(
+        svg,
+        ean13Value,
+        {
+          format: 'EAN13',
+
+          width: Math.max(
+            1,
+            Math.floor(
+              widthPx / 110
+            )
+          ),
+
+          height: heightPx,
+
+          displayValue: false,
+
+          margin: 0,
+
+          marginTop: 0,
+          marginBottom: 0,
+          marginLeft: 0,
+          marginRight: 0,
+
+          background:
+            '#ffffff',
+
+          lineColor:
+            '#000000',
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        'Barcode render error:',
+        error
+      );
+
+    }
+
+  }, [
+    key,
+    ean13Value,
+    bc.width,
+    bc.height,
+  ]);
+
+
+  /**
+   * ==========================================================
+   * STICKER ROOT
+   * ==========================================================
+   */
   return (
     <div
       style={{
-        position: 'absolute',
+        position:
+          'absolute',
+
         left: 0,
         top: 0,
-        width: '100%',
-        height: '100%',
-        overflow: 'hidden',
-        background: '#ffffff',
-        fontFamily: "'Inter', Arial, Helvetica, sans-serif",
-        color: '#000000',
-        border: showBorder ? '0.1mm solid #9ca3af' : 'none',
-        boxSizing: 'border-box',
+
+        width:
+          '100%',
+
+        height:
+          '100%',
+
+        overflow:
+          'hidden',
+
+        background:
+          '#ffffff',
+
+        fontFamily:
+          "'Inter', Arial, Helvetica, sans-serif",
+
+        color:
+          '#000000',
+
+        border:
+          showBorder
+            ? '0.1mm solid #9ca3af'
+            : 'none',
+
+        boxSizing:
+          'border-box',
       }}
     >
+
+      {/* ====================================================
+          COMPANY NAME
+      ==================================================== */}
       <div
         style={{
-          position: 'absolute',
-          left: mm(cn.x),
-          top: mm(cn.y),
-          width: mm(cn.width),
-          height: mm(cn.height),
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          fontSize: `${companyNameFontSize}pt`,
-          fontWeight: 700,
-          lineHeight: 1.1,
-          letterSpacing: '0.02em',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
-          textOverflow: 'ellipsis',
+          position:
+            'absolute',
+
+          left:
+            mm(cn.x),
+
+          top:
+            mm(cn.y),
+
+          width:
+            mm(cn.width),
+
+          height:
+            mm(cn.height),
+
+          display:
+            'flex',
+
+          alignItems:
+            'center',
+
+          justifyContent:
+            'center',
+
+          textAlign:
+            'center',
+
+          fontSize:
+            `${companyNameFontSize}pt`,
+
+          fontWeight:
+            700,
+
+          lineHeight:
+            1.1,
+
+          letterSpacing:
+            '0.02em',
+
+          overflow:
+            'hidden',
+
+          whiteSpace:
+            'nowrap',
+
+          textOverflow:
+            'ellipsis',
+
+          boxSizing:
+            'border-box',
         }}
       >
         {companyName}
       </div>
 
+
+      {/* ====================================================
+          PRODUCT NAME
+      ==================================================== */}
       <div
         style={{
-          position: 'absolute',
-          left: mm(pn.x),
-          top: mm(pn.y),
-          width: mm(pn.width),
-          height: mm(pn.height),
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          fontSize: `${productNameFontSize}pt`,
-          fontWeight: 600,
-          lineHeight: 1.15,
-          overflow: 'hidden',
-          wordBreak: 'break-word',
-          hyphens: 'auto',
+          position:
+            'absolute',
+
+          left:
+            mm(pn.x),
+
+          top:
+            mm(pn.y),
+
+          width:
+            mm(pn.width),
+
+          height:
+            mm(pn.height),
+
+          display:
+            'flex',
+
+          alignItems:
+            'center',
+
+          justifyContent:
+            'center',
+
+          textAlign:
+            'center',
+
+          fontSize:
+            `${productNameFontSize}pt`,
+
+          fontWeight:
+            600,
+
+          lineHeight:
+            1.15,
+
+          overflow:
+            'hidden',
+
+          wordBreak:
+            'break-word',
+
+          hyphens:
+            'auto',
+
+          boxSizing:
+            'border-box',
+
+          padding:
+            0,
+
+          margin:
+            0,
         }}
       >
         {productName}
       </div>
 
+
+      {/* ====================================================
+          PRICE
+      ==================================================== */}
       <div
         style={{
-          position: 'absolute',
-          left: mm(pr.x),
-          top: mm(pr.y),
-          width: mm(pr.width),
-          height: mm(pr.height),
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          fontSize: `${priceFontSize}pt`,
-          fontWeight: 800,
-          lineHeight: 1,
-          letterSpacing: '0.01em',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
+          position:
+            'absolute',
+
+          left:
+            mm(pr.x),
+
+          top:
+            mm(pr.y),
+
+          width:
+            mm(pr.width),
+
+          height:
+            mm(pr.height),
+
+          display:
+            'flex',
+
+          alignItems:
+            'center',
+
+          justifyContent:
+            'center',
+
+          textAlign:
+            'center',
+
+          fontSize:
+            `${priceFontSize}pt`,
+
+          fontWeight:
+            800,
+
+          lineHeight:
+            1,
+
+          letterSpacing:
+            '0.01em',
+
+          overflow:
+            'hidden',
+
+          whiteSpace:
+            'nowrap',
+
+          boxSizing:
+            'border-box',
+
+          padding:
+            0,
+
+          margin:
+            0,
         }}
       >
         {priceText}
       </div>
 
+
+      {/* ====================================================
+          BARCODE
+      ==================================================== */}
       <div
         style={{
-          position: 'absolute',
-          left: mm(bc.x),
-          top: mm(bc.y),
-          width: mm(bc.width),
-          height: mm(bc.height),
-          background: '#ffffff',
+          position:
+            'absolute',
+
+          left:
+            mm(bc.x),
+
+          top:
+            mm(bc.y),
+
+          width:
+            mm(bc.width),
+
+          height:
+            mm(bc.height),
+
+          background:
+            '#ffffff',
+
+          overflow:
+            'hidden',
+
+          boxSizing:
+            'border-box',
+
+          padding:
+            0,
+
+          margin:
+            0,
         }}
       >
         <svg
-          ref={inlineBarcodeSvgRef}
+          ref={
+            inlineBarcodeSvgRef
+          }
           style={{
-            width: '100%',
-            height: '100%',
-            display: 'block',
+            width:
+              '100%',
+
+            height:
+              '100%',
+
+            display:
+              'block',
+
+            margin:
+              0,
+
+            padding:
+              0,
           }}
         />
       </div>
 
+
+      {/* ====================================================
+          BARCODE NUMBER
+      ==================================================== */}
       <div
         style={{
-          position: 'absolute',
-          left: mm(bn.x),
-          top: mm(bn.y),
-          width: mm(bn.width),
-          height: mm(bn.height),
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          fontSize: `${barcodeNumberFontSize}pt`,
-          fontWeight: 600,
-          lineHeight: 1,
-          fontFamily: "'Courier New', monospace",
-          letterSpacing: '0.08em',
-          overflow: 'hidden',
-          whiteSpace: 'nowrap',
+          position:
+            'absolute',
+
+          left:
+            mm(bn.x),
+
+          top:
+            mm(bn.y),
+
+          width:
+            mm(bn.width),
+
+          height:
+            mm(bn.height),
+
+          display:
+            'flex',
+
+          alignItems:
+            'center',
+
+          justifyContent:
+            'center',
+
+          textAlign:
+            'center',
+
+          fontSize:
+            `${barcodeNumberFontSize}pt`,
+
+          fontWeight:
+            600,
+
+          lineHeight:
+            1,
+
+          fontFamily:
+            "'Courier New', monospace",
+
+          letterSpacing:
+            '0.08em',
+
+          overflow:
+            'hidden',
+
+          whiteSpace:
+            'nowrap',
+
+          boxSizing:
+            'border-box',
+
+          padding:
+            0,
+
+          margin:
+            0,
         }}
       >
         {ean13Value}
       </div>
+
     </div>
   );
 }
