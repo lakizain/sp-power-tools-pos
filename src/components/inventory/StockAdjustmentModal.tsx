@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, PlusCircle, MinusCircle, Hash, AlertTriangle, Package, TrendingUp, TrendingDown, Equal } from 'lucide-react';
-import { Product } from '../../types';
+import { Product, StockAdjustmentMode, StockAdjustmentReason } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 import Swal from 'sweetalert2';
 
-type AdjustmentMode = 'add' | 'remove' | 'set';
-type AdjustmentReason = 'purchase' | 'return' | 'damaged' | 'stock_count' | 'theft' | 'other';
-
-const REASON_OPTIONS: { value: AdjustmentReason; label: string; icon: React.ReactNode }[] = [
+const REASON_OPTIONS: { value: StockAdjustmentReason; label: string; icon: React.ReactNode }[] = [
   { value: 'purchase', label: 'Purchase (Goods Received)', icon: <Package className="h-4 w-4" /> },
   { value: 'return', label: 'Customer Return', icon: <TrendingUp className="h-4 w-4" /> },
   { value: 'stock_count', label: 'Physical Stock Count', icon: <Hash className="h-4 w-4" /> },
@@ -23,9 +21,10 @@ interface StockAdjustmentModalProps {
 }
 
 export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentComplete }: StockAdjustmentModalProps) {
-  const [mode, setMode] = useState<AdjustmentMode>('add');
+  const { user, profile } = useAuth();
+  const [mode, setMode] = useState<StockAdjustmentMode>('add');
   const [quantity, setQuantity] = useState<string>('');
-  const [reason, setReason] = useState<AdjustmentReason>('purchase');
+  const [reason, setReason] = useState<StockAdjustmentReason>('purchase');
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [individualQuantities, setIndividualQuantities] = useState<Record<string, string>>({});
@@ -45,25 +44,27 @@ export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentCo
     }
   }, [isOpen, products]);
 
-  const calculateNewStock = (product: Product): number => {
-    let qty: number;
-    if (isMulti) {
-      qty = parseFloat(quantity) || 0;
-    } else {
-      const iq = individualQuantities[product.id];
-      qty = (iq !== undefined && iq !== '') ? (parseFloat(iq) || 0) : (parseFloat(quantity) || 0);
-    }
-    switch (mode) {
-      case 'add': return product.stock + qty;
-      case 'remove': return Math.max(0, product.stock - qty);
-      case 'set': return Math.max(0, qty);
-    }
-  };
-
-  const getStockChange = (product: Product): number => {
-    const newStock = calculateNewStock(product);
-    return newStock - product.stock;
-  };
+  const previewRows = useMemo(() => {
+    return products.map(p => {
+      let qty: number;
+      if (isMulti) {
+        qty = parseFloat(quantity) || 0;
+      } else {
+        const iq = individualQuantities[p.id];
+        qty = (iq !== undefined && iq !== '') ? (parseFloat(iq) || 0) : (parseFloat(quantity) || 0);
+      }
+      let newStock: number;
+      switch (mode) {
+        case 'add': newStock = p.stock + qty; break;
+        case 'remove': newStock = Math.max(0, p.stock - qty); break;
+        case 'set': newStock = Math.max(0, qty); break;
+      }
+      const change = newStock - p.stock;
+      const isLow = p.trackInventory !== false && newStock <= (p.minStock || 0);
+      const isOut = p.trackInventory !== false && newStock === 0;
+      return { product: p, newStock, change, isLow, isOut, oldStock: p.stock };
+    });
+  }, [products, isMulti, individualQuantities, quantity, mode]);
 
   const allQuantitiesValid = useMemo(() => {
     if (products.length === 0) return false;
@@ -79,16 +80,6 @@ export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentCo
     });
   }, [products, isMulti, quantity, individualQuantities]);
 
-  const previewRows = useMemo(() => {
-    return products.map(p => {
-      const newStock = calculateNewStock(p);
-      const change = getStockChange(p);
-      const isLow = p.trackInventory !== false && newStock <= (p.minStock || 0);
-      const isOut = p.trackInventory !== false && newStock === 0;
-      return { product: p, newStock, change, isLow, isOut };
-    });
-  }, [products, individualQuantities, quantity, mode]);
-
   const handleSubmit = async () => {
     if (!allQuantitiesValid) {
       await Swal.fire({
@@ -100,9 +91,7 @@ export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentCo
       return;
     }
 
-    const hasNegativeAfterRemove = previewRows.some(r => r.product.stock - (parseFloat(
-      isMulti ? quantity : (individualQuantities[r.product.id] || quantity)
-    ) || 0) < 0 && mode === 'remove');
+    const hasNegativeAfterRemove = previewRows.some(r => mode === 'remove' && r.product.stock - (r.oldStock - r.newStock) < 0 && r.newStock !== r.product.stock);
 
     if (hasNegativeAfterRemove && mode === 'remove') {
       const result = await Swal.fire({
@@ -123,8 +112,15 @@ export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentCo
         id: r.product.id,
         stockChange: r.change,
         newStock: r.newStock,
+        oldStock: r.oldStock,
       }));
-      await productsService.batchStockUpdate(updates);
+      await productsService.batchStockUpdate(updates, {
+        adjustmentMode: mode,
+        reason,
+        notes: notes.trim() || undefined,
+        userId: user?.id,
+        profileName: profile?.name || profile?.username,
+      });
 
       const totalChange = previewRows.reduce((s, r) => s + r.change, 0);
       await Swal.fire({
@@ -155,7 +151,7 @@ export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentCo
 
   if (!isOpen || products.length === 0) return null;
 
-  const modeBtnClass = (m: AdjustmentMode) =>
+  const modeBtnClass = (m: StockAdjustmentMode) =>
     `flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-semibold transition-all ${
       mode === m
         ? (m === 'add' ? 'bg-green-500 text-white shadow-lg shadow-green-200'
@@ -197,6 +193,15 @@ export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentCo
             </div>
           )}
 
+          {profile && (
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="inline-block w-2 h-2 bg-green-500 rounded-full" />
+              Logging adjustment as <span className="font-semibold text-gray-700">{profile.name || profile.username}</span>
+              <span className="text-gray-300">|</span>
+              <span className="font-mono text-gray-400 truncate">{user?.id?.slice(0, 12)}…</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-3">
             <button className={modeBtnClass('add')} onClick={() => setMode('add')}>
               <PlusCircle className="h-5 w-5" />
@@ -220,7 +225,6 @@ export function StockAdjustmentModal({ isOpen, onClose, products, onAdjustmentCo
               <input
                 type="number"
                 min={0}
-                step={mode === 'set' ? 1 : 1}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 className="input text-xl font-semibold text-center"

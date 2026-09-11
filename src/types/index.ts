@@ -32,6 +32,23 @@ export interface ProductBatch {
   supplierInfo?: string;
 }
 
+export type StockAdjustmentMode = 'add' | 'remove' | 'set';
+export type StockAdjustmentReason = 'purchase' | 'return' | 'stock_count' | 'damaged' | 'theft' | 'other';
+
+export interface StockAdjustment {
+  id: string;
+  productId: string;
+  userId?: string;
+  profileName?: string;
+  oldStock: number;
+  newStock: number;
+  quantityChange: number;
+  adjustmentMode: StockAdjustmentMode;
+  reason: StockAdjustmentReason;
+  notes?: string;
+  createdAt: Date;
+}
+
 export interface Customer {
   id: string;
   name: string;

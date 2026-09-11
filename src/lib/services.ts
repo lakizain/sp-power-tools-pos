@@ -21,7 +21,10 @@ import {
   OutstandingPayment,
   Rental,
   RentalItem,
-  ProductCategory
+  ProductCategory,
+  StockAdjustment,
+  StockAdjustmentMode,
+  StockAdjustmentReason,
 } from '../types'
 
 // Products Service
@@ -174,19 +177,48 @@ export const productsService = {
     if (error) throw error
   },
 
-  async batchStockUpdate(updates: { id: string; stockChange: number; newStock: number }[]): Promise<void> {
+  async batchStockUpdate(
+    updates: { id: string; stockChange: number; newStock: number; oldStock: number }[],
+    auditInfo?: {
+      adjustmentMode: StockAdjustmentMode;
+      reason: StockAdjustmentReason;
+      notes?: string;
+      userId?: string;
+      profileName?: string;
+    }
+  ): Promise<void> {
     if (updates.length === 0) return;
 
-    const promises = updates.map(u =>
+    const stockPromises = updates.map(u =>
       supabase
         .from('products')
         .update({ stock: u.newStock })
         .eq('id', u.id)
     );
 
-    const results = await Promise.all(promises);
-    const firstError = results.find(r => r.error);
-    if (firstError?.error) throw firstError.error;
+    const stockResults = await Promise.all(stockPromises);
+    const firstStockError = stockResults.find(r => r.error);
+    if (firstStockError?.error) throw firstStockError.error;
+
+    if (auditInfo) {
+      const logs = updates.map(u => ({
+        product_id: u.id,
+        user_id: auditInfo.userId || null,
+        profile_name: auditInfo.profileName || null,
+        old_stock: u.oldStock,
+        new_stock: u.newStock,
+        quantity_change: u.stockChange,
+        adjustment_mode: auditInfo.adjustmentMode,
+        reason: auditInfo.reason,
+        notes: auditInfo.notes || null,
+      }));
+
+      const { error: logError } = await supabase
+        .from('stock_adjustments')
+        .insert(logs);
+
+      if (logError) throw logError;
+    }
   },
 
   async getById(id: string): Promise<Product> {
@@ -231,6 +263,74 @@ export const productsService = {
       updatedAt: new Date(data.updated_at)
     }
   }
+}
+
+// Stock Adjustments Service (Audit Log)
+export const stockAdjustmentsService = {
+  async getAll(options?: { productId?: string; limit?: number }): Promise<StockAdjustment[]> {
+    let query = supabase
+      .from('stock_adjustments')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (options?.productId) {
+      query = query.eq('product_id', options.productId);
+    }
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    return data.map(row => ({
+      id: row.id,
+      productId: row.product_id,
+      userId: row.user_id || undefined,
+      profileName: row.profile_name || undefined,
+      oldStock: row.old_stock,
+      newStock: row.new_stock,
+      quantityChange: row.quantity_change,
+      adjustmentMode: row.adjustment_mode as StockAdjustmentMode,
+      reason: row.reason as StockAdjustmentReason,
+      notes: row.notes || undefined,
+      createdAt: new Date(row.created_at),
+    }));
+  },
+
+  async create(payload: Omit<StockAdjustment, 'id' | 'createdAt'>): Promise<StockAdjustment> {
+    const { data, error } = await supabase
+      .from('stock_adjustments')
+      .insert({
+        product_id: payload.productId,
+        user_id: payload.userId || null,
+        profile_name: payload.profileName || null,
+        old_stock: payload.oldStock,
+        new_stock: payload.newStock,
+        quantity_change: payload.quantityChange,
+        adjustment_mode: payload.adjustmentMode,
+        reason: payload.reason,
+        notes: payload.notes || null,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      productId: data.product_id,
+      userId: data.user_id || undefined,
+      profileName: data.profile_name || undefined,
+      oldStock: data.old_stock,
+      newStock: data.new_stock,
+      quantityChange: data.quantity_change,
+      adjustmentMode: data.adjustment_mode as StockAdjustmentMode,
+      reason: data.reason as StockAdjustmentReason,
+      notes: data.notes || undefined,
+      createdAt: new Date(data.created_at),
+    };
+  },
 }
 
 // Customers Service
