@@ -93,7 +93,7 @@ const THERMAL_CONFIG = {
 
 const THERMAL_ROLL_CONFIG = {
   mediaWidthMm: 80,
-  stickerOffsetLeftMm: 3,
+  stickerOffsetLeftMm: 0,
   stickerOffsetTopMm: 4.5,
   stickerGapMm: 7,
   bottomPaddingMm: 4.5,
@@ -311,11 +311,13 @@ function calculateLayout(
   yCursor += productNameHeightMm + gapMm;
 
   /**
-   * Barcode centered horizontally.
+   * Thermal: barcode left-aligned with content margin.
+   * A4 grid: barcode horizontally centered.
    */
-  const barcodeX =
-    marginLeftMm +
-    (contentWidthMm - barcodeWidthMm) / 2;
+  const barcodeX = isThermal
+    ? marginLeftMm
+    : marginLeftMm +
+      (contentWidthMm - barcodeWidthMm) / 2;
 
   const barcode = {
     x: barcodeX,
@@ -755,6 +757,8 @@ export function BarcodeStickerPrint({
     bn,
 
     showBarcodeNumber: true,
+
+    leftAlignContent: mode === 'thermal',
 
     showBorder:
       mode === 'a4grid' &&
@@ -1754,6 +1758,7 @@ interface StickerContentProps {
 
   showBarcodeNumber?: boolean;
   showBorder?: boolean;
+  leftAlignContent?: boolean;
 }
 
 
@@ -1783,6 +1788,7 @@ function StickerContent({
 
   showBarcodeNumber = true,
   showBorder = false,
+  leftAlignContent = false,
 }: StickerContentProps) {
 
   const inlineBarcodeSvgRef =
@@ -1987,10 +1993,14 @@ function StickerContent({
             'center',
 
           justifyContent:
-            'center',
+            leftAlignContent
+              ? 'flex-start'
+              : 'center',
 
           textAlign:
-            'center',
+            leftAlignContent
+              ? 'left'
+              : 'center',
 
           fontSize:
             `${companyNameFontSize}pt`,
@@ -2048,10 +2058,14 @@ function StickerContent({
             'center',
 
           justifyContent:
-            'center',
+            leftAlignContent
+              ? 'flex-start'
+              : 'center',
 
           textAlign:
-            'center',
+            leftAlignContent
+              ? 'left'
+              : 'center',
 
           fontSize:
             `${productNameFontSize}pt`,
@@ -2112,10 +2126,14 @@ function StickerContent({
             'center',
 
           justifyContent:
-            'center',
+            leftAlignContent
+              ? 'flex-start'
+              : 'center',
 
           textAlign:
-            'center',
+            leftAlignContent
+              ? 'left'
+              : 'center',
 
           fontSize:
             `${priceFontSize}pt`,
@@ -2234,10 +2252,14 @@ function StickerContent({
               'center',
 
             justifyContent:
-              'center',
+              leftAlignContent
+                ? 'flex-start'
+                : 'center',
 
             textAlign:
-              'center',
+              leftAlignContent
+                ? 'left'
+                : 'center',
 
             fontSize:
               `${barcodeNumberFontSize}pt`,
