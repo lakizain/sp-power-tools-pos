@@ -3,7 +3,7 @@ import { Product } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import {
   renderBarcodeToSvg,
-  toValidEan13 as utilsToValidEan13,
+  normalizeCode128Value,
 } from '../../lib/barcodeUtils';
 import { X, Printer, Minus, Plus } from 'lucide-react';
 
@@ -35,11 +35,12 @@ import { X, Printer, Minus, Plus } from 'lucide-react';
  *   Width  = 38mm
  *   Height = 25mm
  *
- * The 80mm printer path is NOT used as the PDF/page width.
- * The actual label/page width is 38mm.
+ * Thermal preview/print is rendered on an 80mm roll canvas,
+ * while each physical label remains 38mm × 25mm and is
+ * left-aligned on the media to match the printer example.
  */
 const THERMAL_CONFIG = {
-  pageWidthMm: 38,
+  pageWidthMm: 80,
   pageHeightMm: 25,
 
   stickerWidthMm: 38,
@@ -53,15 +54,15 @@ const THERMAL_CONFIG = {
    */
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
-  marginTopMm: 0.5,
-  marginBottomMm: 0.5,
+  marginTopMm: 1.0,
+  marginBottomMm: 1.0,
 
-  companyNameHeightMm: 1.8,
+  companyNameHeightMm: 2.4,
 
-  productNameBaseHeightMm: 1.9,
+  productNameBaseHeightMm: 3.2,
   productNameMaxLines: 2,
 
-  priceHeightMm: 2.6,
+  priceHeightMm: 3.3,
 
   /**
    * Barcode number area.
@@ -71,23 +72,32 @@ const THERMAL_CONFIG = {
   /**
    * Small vertical gaps to maximize usable sticker area.
    */
-  gapMm: 0.2,
+  gapMm: 0.25,
 
   /**
    * 35mm barcode inside 36mm content area.
    *
    * Do NOT use 37mm here because the content width is only 36mm.
    */
-  barcodeWidthMm: 35.0,
+  barcodeWidthMm: 34.8,
 
-  barcodeMinHeightMm: 9.0,
-  barcodeMaxHeightMm: 11.5,
+  barcodeMinHeightMm: 8.2,
+  barcodeMaxHeightMm: 8.8,
 
-  companyNameFontSizePt: 5.5,
-  productNameFontSizePt: 5.5,
-  productNameFontSizeSmallPt: 5.0,
-  priceFontSizePt: 8.0,
-  barcodeNumberFontSizePt: 8.0,
+  companyNameFontSizePt: 8.0,
+  productNameFontSizePt: 8.4,
+  productNameFontSizeSmallPt: 7.4,
+  priceFontSizePt: 10.5,
+  barcodeNumberFontSizePt: 7.2,
+} as const;
+
+const THERMAL_ROLL_CONFIG = {
+  mediaWidthMm: 80,
+  stickerOffsetLeftMm: 3,
+  stickerOffsetTopMm: 4.5,
+  stickerGapMm: 7,
+  bottomPaddingMm: 4.5,
+  previewMaxCopies: 3,
 } as const;
 
 /**
@@ -180,6 +190,9 @@ function calculateLayout(
   productNameStr: string,
   config: StickerConfig
 ) {
+  const isThermal =
+    config === THERMAL_CONFIG;
+
   const {
     stickerWidthMm,
     stickerHeightMm,
@@ -228,21 +241,23 @@ function calculateLayout(
     productNameBaseHeightMm * productNameLines;
 
   /**
-   * Four small vertical gaps:
+   * Thermal uses:
+   * Company -> Product -> Barcode -> Price
    *
-   * Company
-   * Product
-   * Price
-   * Barcode
-   * Barcode number
+   * A4 uses:
+   * Company -> Product -> Price -> Barcode -> Barcode number
    */
-  const fixedGaps = gapMm * 4;
+  const fixedGaps =
+    gapMm * 4;
+
+  const barcodeNumberReservedHeightMm =
+    barcodeNumberHeightMm;
 
   const fixedElementsHeightMm =
     companyNameHeightMm +
     productNameHeightMm +
     priceHeightMm +
-    barcodeNumberHeightMm +
+    barcodeNumberReservedHeightMm +
     fixedGaps;
 
   /**
@@ -296,18 +311,6 @@ function calculateLayout(
   yCursor += productNameHeightMm + gapMm;
 
   /**
-   * Price
-   */
-  const price = {
-    x: marginLeftMm,
-    y: yCursor,
-    width: contentWidthMm,
-    height: priceHeightMm,
-  };
-
-  yCursor += priceHeightMm + gapMm;
-
-  /**
    * Barcode centered horizontally.
    */
   const barcodeX =
@@ -324,6 +327,24 @@ function calculateLayout(
   yCursor += barcodeHeightMm + gapMm;
 
   /**
+   * Thermal label follows the example:
+   * company -> product -> barcode -> price
+   *
+   * A4 keeps:
+   * company -> product -> price -> barcode -> number
+   */
+  const price = {
+    x: marginLeftMm,
+    y: isThermal ? yCursor : productName.y + productName.height + gapMm,
+    width: contentWidthMm,
+    height: priceHeightMm,
+  };
+
+  if (isThermal) {
+    yCursor += priceHeightMm + gapMm;
+  }
+
+  /**
    * Barcode number
    */
   const barcodeNumber = {
@@ -332,6 +353,16 @@ function calculateLayout(
     width: contentWidthMm,
     height: barcodeNumberHeightMm,
   };
+
+  if (!isThermal) {
+    barcode.y =
+      price.y + price.height + gapMm;
+
+    barcodeNumber.y =
+      barcode.y +
+      barcode.height +
+      gapMm;
+  }
 
   return {
     stickerWidthMm,
@@ -723,6 +754,8 @@ export function BarcodeStickerPrint({
     bc,
     bn,
 
+    showBarcodeNumber: true,
+
     showBorder:
       mode === 'a4grid' &&
       A4_GRID_CONFIG.showBorder,
@@ -737,48 +770,69 @@ export function BarcodeStickerPrint({
    *
    * 38mm × 25mm
    *
-   * One sticker per page.
+   * 80mm roll canvas with left-aligned stacked labels.
    */
-  const renderThermalSheet = () =>
-    Array.from(
-      { length: copies }
-    ).map((_, i) => (
+  const renderThermalSheet = () => {
+    const rollHeightMm =
+      THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+      copies *
+        THERMAL_CONFIG.stickerHeightMm +
+      Math.max(0, copies - 1) *
+        THERMAL_ROLL_CONFIG.stickerGapMm +
+      THERMAL_ROLL_CONFIG.bottomPaddingMm;
+
+    return (
       <div
-        key={`thermal-${i}`}
         style={{
-          width: '38mm',
-          height: '25mm',
-
+          width: mm(
+            THERMAL_ROLL_CONFIG.mediaWidthMm
+          ),
+          minHeight: mm(rollHeightMm),
           position: 'relative',
-
-          pageBreakAfter:
-            i < copies - 1
-              ? 'always'
-              : 'auto',
-
-          breakAfter:
-            i < copies - 1
-              ? 'page'
-              : 'auto',
-
           overflow: 'hidden',
-
           background: '#ffffff',
-
           margin: 0,
           padding: 0,
-
-          boxSizing:
-            'border-box',
+          boxSizing: 'border-box',
         }}
       >
-        <StickerContent
-          {...stickerContentProps}
-          stickerKey={`t-${i}`}
-          showBorder={false}
-        />
+        {Array.from({ length: copies }).map((_, i) => (
+          <div
+            key={`thermal-${i}`}
+            style={{
+              width: mm(
+                THERMAL_CONFIG.stickerWidthMm
+              ),
+              height: mm(
+                THERMAL_CONFIG.stickerHeightMm
+              ),
+              position: 'absolute',
+              left: mm(
+                THERMAL_ROLL_CONFIG.stickerOffsetLeftMm
+              ),
+              top: mm(
+                THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+                  i *
+                    (THERMAL_CONFIG.stickerHeightMm +
+                      THERMAL_ROLL_CONFIG.stickerGapMm)
+              ),
+              overflow: 'hidden',
+              background: '#ffffff',
+              margin: 0,
+              padding: 0,
+              boxSizing: 'border-box',
+            }}
+          >
+            <StickerContent
+              {...stickerContentProps}
+              stickerKey={`t-${i}`}
+              showBorder={true}
+            />
+          </div>
+        ))}
       </div>
-    ));
+    );
+  };
 
   /**
    * ============================================================
@@ -925,17 +979,33 @@ export function BarcodeStickerPrint({
       const pxPerMm =
         3.7795275591;
 
+      const previewCopies =
+        Math.min(
+          copies,
+          THERMAL_ROLL_CONFIG.previewMaxCopies
+        );
+
+      const rollHeightMm =
+        THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+        previewCopies *
+          THERMAL_CONFIG.stickerHeightMm +
+        Math.max(
+          0,
+          previewCopies - 1
+        ) *
+          THERMAL_ROLL_CONFIG.stickerGapMm +
+        THERMAL_ROLL_CONFIG.bottomPaddingMm;
+
       return (
         <div
           style={{
             width:
-              `${THERMAL_CONFIG.stickerWidthMm * pxPerMm}px`,
+              `${THERMAL_ROLL_CONFIG.mediaWidthMm * pxPerMm}px`,
 
             height:
-              `${THERMAL_CONFIG.stickerHeightMm * pxPerMm}px`,
+              `${rollHeightMm * pxPerMm}px`,
 
-            border:
-              '1px dashed #9ca3af',
+            border: '1px solid #d1d5db',
 
             position:
               'relative',
@@ -952,11 +1022,32 @@ export function BarcodeStickerPrint({
               'hidden',
           }}
         >
-          <StickerContent
-            {...stickerContentProps}
-            stickerKey="pv-thermal"
-            showBorder={false}
-          />
+          {Array.from({
+            length: previewCopies,
+          }).map((_, i) => (
+            <div
+              key={`pv-thermal-${i}`}
+              style={{
+                position: 'absolute',
+                left: `${THERMAL_ROLL_CONFIG.stickerOffsetLeftMm * pxPerMm}px`,
+                top: `${(THERMAL_ROLL_CONFIG.stickerOffsetTopMm +
+                  i *
+                    (THERMAL_CONFIG.stickerHeightMm +
+                      THERMAL_ROLL_CONFIG.stickerGapMm)) * pxPerMm}px`,
+                width: `${THERMAL_CONFIG.stickerWidthMm * pxPerMm}px`,
+                height: `${THERMAL_CONFIG.stickerHeightMm * pxPerMm}px`,
+                background: '#ffffff',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+              }}
+            >
+              <StickerContent
+                {...stickerContentProps}
+                stickerKey={`pv-thermal-${i}`}
+                showBorder={true}
+              />
+            </div>
+          ))}
         </div>
       );
     }
@@ -1392,11 +1483,10 @@ export function BarcodeStickerPrint({
           /*
            * Thermal page.
            *
-           * EXACT:
-           * 38mm × 25mm
+           * 80mm roll width.
            */
           @page thermal {
-            size: 38mm 25mm;
+            size: 80mm auto;
             margin: 0;
           }
 
@@ -1502,7 +1592,8 @@ export function BarcodeStickerPrint({
             #barcode-sticker-print-root[data-print-mode="thermal"] {
               page: thermal !important;
 
-              width: 38mm !important;
+              width: 80mm !important;
+              height: auto !important;
 
               margin: 0 !important;
               padding: 0 !important;
@@ -1512,11 +1603,11 @@ export function BarcodeStickerPrint({
 
 
             /*
-             * Every thermal label.
+             * Thermal roll wrapper.
              */
             #barcode-sticker-print-root[data-print-mode="thermal"] > div {
-              width: 38mm !important;
-              height: 25mm !important;
+              width: 80mm !important;
+              height: auto !important;
 
               margin: 0 !important;
               padding: 0 !important;
@@ -1661,6 +1752,7 @@ interface StickerContentProps {
 
   stickerKey: string;
 
+  showBarcodeNumber?: boolean;
   showBorder?: boolean;
 }
 
@@ -1689,6 +1781,7 @@ function StickerContent({
 
   stickerKey,
 
+  showBarcodeNumber = true,
   showBorder = false,
 }: StickerContentProps) {
 
@@ -1696,12 +1789,12 @@ function StickerContent({
     useRef<SVGSVGElement>(null);
 
   /**
-   * Convert barcode to valid EAN13.
+   * Normalize barcode for Code 128 rendering.
    */
-  const ean13Value =
+  const normalizedBarcodeValue =
     useMemo(
       () =>
-        utilsToValidEan13(
+        normalizeCode128Value(
           barcodeValue
         ),
       [barcodeValue]
@@ -1711,7 +1804,7 @@ function StickerContent({
    * Unique rendering key.
    */
   const key =
-    `${stickerKey}-${ean13Value}-${bc.width}-${bc.height}`;
+    `${stickerKey}-${normalizedBarcodeValue}-${bc.width}-${bc.height}`;
 
 
   /**
@@ -1723,7 +1816,7 @@ function StickerContent({
 
     if (
       !inlineBarcodeSvgRef.current ||
-      !ean13Value
+      !normalizedBarcodeValue
     ) {
       return;
     }
@@ -1780,15 +1873,13 @@ function StickerContent({
 
       renderBarcodeToSvg(
         svg,
-        ean13Value,
+        normalizedBarcodeValue,
         {
-          format: 'EAN13',
+          format: 'CODE128',
 
           width: Math.max(
             1,
-            Math.floor(
-              widthPx / 110
-            )
+            Math.floor(widthPx / 180)
           ),
 
           height: heightPx,
@@ -1821,7 +1912,7 @@ function StickerContent({
 
   }, [
     key,
-    ean13Value,
+    normalizedBarcodeValue,
     bc.width,
     bc.height,
   ]);
@@ -2118,71 +2209,70 @@ function StickerContent({
       </div>
 
 
-      {/* ====================================================
-          BARCODE NUMBER
-      ==================================================== */}
-      <div
-        style={{
-          position:
-            'absolute',
+      {showBarcodeNumber && (
+        <div
+          style={{
+            position:
+              'absolute',
 
-          left:
-            mm(bn.x),
+            left:
+              mm(bn.x),
 
-          top:
-            mm(bn.y),
+            top:
+              mm(bn.y),
 
-          width:
-            mm(bn.width),
+            width:
+              mm(bn.width),
 
-          height:
-            mm(bn.height),
+            height:
+              mm(bn.height),
 
-          display:
-            'flex',
+            display:
+              'flex',
 
-          alignItems:
-            'center',
+            alignItems:
+              'center',
 
-          justifyContent:
-            'center',
+            justifyContent:
+              'center',
 
-          textAlign:
-            'center',
+            textAlign:
+              'center',
 
-          fontSize:
-            `${barcodeNumberFontSize}pt`,
+            fontSize:
+              `${barcodeNumberFontSize}pt`,
 
-          fontWeight:
-            600,
+            fontWeight:
+              600,
 
-          lineHeight:
-            1,
+            lineHeight:
+              1,
 
-          fontFamily:
-            "'Courier New', monospace",
+            fontFamily:
+              "'Courier New', monospace",
 
-          letterSpacing:
-            '0.08em',
+            letterSpacing:
+              '0.08em',
 
-          overflow:
-            'hidden',
+            overflow:
+              'hidden',
 
-          whiteSpace:
-            'nowrap',
+            whiteSpace:
+              'nowrap',
 
-          boxSizing:
-            'border-box',
+            boxSizing:
+              'border-box',
 
-          padding:
-            0,
+            padding:
+              0,
 
-          margin:
-            0,
-        }}
-      >
-        {ean13Value}
-      </div>
+            margin:
+              0,
+          }}
+        >
+          {normalizedBarcodeValue}
+        </div>
+      )}
 
     </div>
   );

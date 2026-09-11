@@ -1,5 +1,28 @@
 import JsBarcode from 'jsbarcode';
 
+export function normalizeCode128Value(value: string): string {
+  return (value || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\-./+$% ]/g, '')
+    .replace(/\s+/g, '')
+    .slice(0, 18);
+}
+
+export function generateCode128Value(sku?: string): string {
+  const prefix = '15';
+  const skuDigits = (sku || '')
+    .replace(/\D/g, '')
+    .slice(-4)
+    .padStart(4, '0');
+  const timestampDigits = Date.now()
+    .toString()
+    .slice(-7);
+
+  return normalizeCode128Value(
+    `${prefix}${skuDigits}${timestampDigits}`
+  );
+}
+
 export function calculateEan13CheckDigit(digits12: string): string {
   const clean = digits12.replace(/\D/g, '').slice(0, 12).padStart(12, '0');
   const weights = [1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3];
