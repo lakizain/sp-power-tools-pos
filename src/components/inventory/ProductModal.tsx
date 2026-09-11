@@ -350,12 +350,15 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
         const newProduct = await productsService.create(productData);
         dispatch({ type: 'ADD_PRODUCT', payload: newProduct });
         finalProduct = newProduct;
+        resetAddProductForm();
         const result = await Swal.fire({
           title: 'Product Added Successfully!',
-          text: 'Would you like to print barcode stickers for this product?',
+          text: 'Fields cleared. Add another product, print stickers, or close.',
           icon: 'success',
+          showDenyButton: true,
           showCancelButton: true,
           confirmButtonText: 'Print Stickers',
+          denyButtonText: 'Add Another',
           cancelButtonText: 'Close',
         });
         if (result.isConfirmed && finalProduct.barcode) {
@@ -363,8 +366,14 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
           setShowStickerPrint(true);
           return;
         }
+        if (result.isDismissed) {
+          onClose();
+          return;
+        }
       }
-      onClose();
+      if (product) {
+        onClose();
+      }
     } catch (error) {
       console.error('Error saving product:', error);
       await Swal.fire({
@@ -420,6 +429,30 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const resetAddProductForm = () => {
+    setFormData({
+      name: '',
+      sku: '',
+      barcode: '',
+      price: '',
+      cost: '',
+      stock: '',
+      minStock: '',
+      category: '',
+      description: '',
+      taxable: true,
+      active: true,
+      isWeightBased: false,
+      pricePerUnit: '',
+      unit: 'kg',
+      image: '',
+      trackInventory: true,
+    });
+    setBatches([]);
+    setIsCustomCategory(false);
+    setSavedProductForSticker(null);
   };
 
   const addBatch = () => {
@@ -987,7 +1020,6 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
         onClose={() => {
           setShowStickerPrint(false);
           setSavedProductForSticker(null);
-          onClose();
         }}
         product={savedProductForSticker || (product as Product)}
       />
