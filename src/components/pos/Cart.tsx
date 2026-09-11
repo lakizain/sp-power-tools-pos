@@ -80,11 +80,8 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
     return sum + (price * item.quantity);
   }, 0);
   const totalDiscount = state.cart.reduce((sum, item) => sum + (item.discount || 0), 0);
-  const taxAmount = (subtotal - totalDiscount) * (state.settings.taxRate / 100);
-  const total = subtotal - totalDiscount + taxAmount;
-
-  // Debug: Log current tax rate (remove this in production)
-  console.log('Current tax rate:', state.settings.taxRate);
+  const taxAmount = 0;
+  const total = subtotal - totalDiscount;
 
   return (
     <div className={`bg-white border-l border-gray-100 flex flex-col h-screen ${
@@ -215,10 +212,6 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
                 <span className="font-medium">-{state.settings.currency} {totalDiscount.toFixed(2)}</span>
               </div>
             )}
-            <div className="flex justify-between text-gray-600">
-              <span>Tax ({state.settings.taxRate}%):</span>
-              <span className="font-medium">{state.settings.currency} {taxAmount.toFixed(2)}</span>
-            </div>
             <div className="flex justify-between text-xl font-bold text-gray-900 pt-3 border-t border-gray-200">
               <span>Total:</span>
               <span>{state.settings.currency} {total.toFixed(2)}</span>

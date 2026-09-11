@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Search, Plus, Edit2, Trash2, Download, Calendar,
-  DollarSign, PieChart, TrendingUp, AlertTriangle, Filter, Tag
+  DollarSign, PieChart, TrendingUp, AlertTriangle, Filter, Tag, Printer, CalendarRange
 } from 'lucide-react';
 import { useApp } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -9,15 +9,19 @@ import { Expense } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { ExpenseModal, DEFAULT_CATEGORIES } from './ExpenseModal';
-import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, startOfWeek } from 'date-fns';
+import { TablePrintModal, PrintColumn, PrintSummary, PrintFilterInfo } from '../ui/TablePrintModal';
 
 export function ExpenseManager() {
   const { state, dispatch } = useApp();
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
+  const [datePreset, setDatePreset] = useState('all');
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
@@ -42,25 +46,59 @@ export function ExpenseManager() {
       const matchesPayment = paymentFilter === 'all' || expense.paymentMethod === paymentFilter;
 
       let matchesDate = true;
-      if (dateFilter !== 'all') {
-        const expenseDate = new Date(expense.date);
+      const expenseDate = new Date(expense.date);
+      if (datePreset === 'custom') {
+        if (customFromDate) {
+          const from = new Date(customFromDate);
+          from.setHours(0, 0, 0, 0);
+          matchesDate = matchesDate && expenseDate >= from;
+        }
+        if (customToDate) {
+          const to = new Date(customToDate);
+          to.setHours(23, 59, 59, 999);
+          matchesDate = matchesDate && expenseDate <= to;
+        }
+      } else if (datePreset !== 'all') {
         const today = new Date(now);
         today.setHours(0, 0, 0, 0);
-        switch (dateFilter) {
+        switch (datePreset) {
           case 'today':
             matchesDate = expenseDate.toDateString() === today.toDateString();
             break;
-          case 'week':
-            const weekAgo = new Date(today);
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            matchesDate = expenseDate >= weekAgo;
+          case 'week': {
+            const ws = startOfWeek(today, { weekStartsOn: 1 });
+            const we = new Date();
+            we.setHours(23, 59, 59, 999);
+            matchesDate = expenseDate >= ws && expenseDate <= we;
             break;
+          }
           case 'month':
             matchesDate = isWithinInterval(expenseDate, {
-              start: startOfMonth(now),
-              end: endOfMonth(now),
+              start: startOfMonth(today),
+              end: endOfMonth(today),
             });
             break;
+          case 'last_month': {
+            const last = subMonths(today, 1);
+            matchesDate = isWithinInterval(expenseDate, {
+              start: startOfMonth(last),
+              end: endOfMonth(last),
+            });
+            break;
+          }
+          case 'last_3_months': {
+            const threeAgo = subMonths(today, 3);
+            const nowEnd = new Date();
+            nowEnd.setHours(23, 59, 59, 999);
+            matchesDate = expenseDate >= startOfMonth(threeAgo) && expenseDate <= nowEnd;
+            break;
+          }
+          case 'year': {
+            const ys = new Date(today.getFullYear(), 0, 1);
+            const ye = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+            matchesDate = expenseDate >= ys && expenseDate <= ye;
+            break;
+          }
         }
       }
 
@@ -75,7 +113,7 @@ export function ExpenseManager() {
       return sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
     return sorted;
-  }, [state.expenses, searchTerm, categoryFilter, paymentFilter, dateFilter]);
+  }, [state.expenses, searchTerm, categoryFilter, paymentFilter, datePreset, customFromDate, customToDate]);
 
   const summary = useMemo(() => {
     const now = new Date();
@@ -204,6 +242,54 @@ export function ExpenseManager() {
     );
   };
 
+  const printColumns: PrintColumn<Expense>[] = [
+    { key: 'date', header: 'Date', accessor: (e) => format(new Date(e.date), 'yyyy-MM-dd'), width: '11%' },
+    { key: 'category', header: 'Category', accessor: (e) => e.category, width: '13%' },
+    { key: 'description', header: 'Description', accessor: (e) => e.description, width: '24%' },
+    { key: 'payment', header: 'Payment', accessor: (e) => e.paymentMethod.charAt(0).toUpperCase() + e.paymentMethod.slice(1).replace('_', ' '), width: '12%' },
+    { key: 'amount', header: 'Amount', accessor: (e) => `${state.settings.currency} ${e.amount.toFixed(2)}`, width: '11%', align: 'right' },
+    { key: 'supplier', header: 'Supplier', accessor: (e) => e.supplierName || '—', width: '15%' },
+    { key: 'receipt', header: 'Receipt #', accessor: (e) => e.receiptNumber || '—', width: '14%' },
+  ];
+
+  const filteredSummary = useMemo(() => {
+    const total = filteredExpenses.reduce((s, e) => s + e.amount, 0);
+    const categoryCount = new Set(filteredExpenses.map(e => e.category)).size;
+    return { total, count: filteredExpenses.length, categoryCount };
+  }, [filteredExpenses]);
+
+  const printSummaries: PrintSummary[] = [
+    { label: 'Total Expenses', value: `${state.settings.currency} ${filteredSummary.total.toFixed(2)}`, highlight: true },
+    { label: 'Transactions', value: String(filteredSummary.count) },
+    { label: 'Categories Used', value: String(filteredSummary.categoryCount) },
+    { label: 'Avg/Transaction', value: `${state.settings.currency} ${filteredSummary.count ? (filteredSummary.total / filteredSummary.count).toFixed(2) : '0.00'}` },
+  ];
+
+  const getDateFilterLabel = (): string => {
+    switch (datePreset) {
+      case 'all': return 'All Time';
+      case 'today': return 'Today';
+      case 'week': return 'This Week';
+      case 'month': return 'This Month';
+      case 'last_month': return 'Last Month';
+      case 'last_3_months': return 'Last 3 Months';
+      case 'year': return 'This Year';
+      case 'custom':
+        if (customFromDate && customToDate) return `${customFromDate} → ${customToDate}`;
+        if (customFromDate) return `From ${customFromDate}`;
+        if (customToDate) return `Up to ${customToDate}`;
+        return 'Custom Range';
+      default: return 'All Time';
+    }
+  };
+
+  const printFilters: PrintFilterInfo[] = [
+    { label: 'Date', value: getDateFilterLabel() },
+    ...(categoryFilter !== 'all' ? [{ label: 'Category', value: categoryFilter }] : []),
+    ...(paymentFilter !== 'all' ? [{ label: 'Payment', value: paymentFilter.charAt(0).toUpperCase() + paymentFilter.slice(1).replace('_', ' ') }] : []),
+    ...(searchTerm ? [{ label: 'Search', value: searchTerm }] : []),
+  ];
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
@@ -211,13 +297,20 @@ export function ExpenseManager() {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Expense Tracking</h1>
           <p className="text-gray-600 mt-1">Monitor and categorize all business expenses</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print PDF</span>
+          </button>
           <button
             onClick={exportExpenses}
             className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
           >
             <Download className="h-4 w-4" />
-            <span>Export</span>
+            <span>Export CSV</span>
           </button>
           <button
             onClick={handleAdd}
@@ -286,7 +379,7 @@ export function ExpenseManager() {
         </div>
       </div>
 
-      <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm">
+      <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-2">
             <div className="relative">
@@ -316,20 +409,24 @@ export function ExpenseManager() {
           </div>
 
           <div className="relative">
-            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <CalendarRange className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value)}
               className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-transparent appearance-none"
             >
-              <option value="all">All Dates</option>
-              <option value="today">Today</option>
-              <option value="week">Last 7 Days</option>
-              <option value="month">This Month</option>
+              <option value="all">📅 All Dates</option>
+              <option value="today">🗓️ Today</option>
+              <option value="week">📆 This Week</option>
+              <option value="month">📊 This Month</option>
+              <option value="last_month">📅 Last Month</option>
+              <option value="last_3_months">📈 Last 3 Months</option>
+              <option value="year">🗃️ This Year</option>
+              <option value="custom">🎯 Custom Range...</option>
             </select>
           </div>
 
-          <div className="hidden lg:block relative">
+          <div className="relative">
             <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <select
               value={paymentFilter}
@@ -343,6 +440,29 @@ export function ExpenseManager() {
             </select>
           </div>
         </div>
+
+        {datePreset === 'custom' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <input
+                type="date"
+                value={customFromDate}
+                onChange={(e) => setCustomFromDate(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm"
+                placeholder="From Date"
+              />
+            </div>
+            <div>
+              <input
+                type="date"
+                value={customToDate}
+                onChange={(e) => setCustomToDate(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-transparent text-sm"
+                placeholder="To Date"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -365,7 +485,7 @@ export function ExpenseManager() {
                     <AlertTriangle className="h-12 w-12 mx-auto text-gray-300 mb-4" />
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">No expenses found</h3>
                     <p className="text-gray-500 mb-4">
-                      {searchTerm || categoryFilter !== 'all' || dateFilter !== 'all'
+                      {searchTerm || categoryFilter !== 'all' || datePreset !== 'all'
                         ? 'Try adjusting your search filters'
                         : 'Start tracking your expenses to see them here'}
                     </p>
@@ -472,6 +592,18 @@ export function ExpenseManager() {
         onClose={() => { setIsModalOpen(false); setEditingExpense(null); }}
         onSave={handleSave}
         editingExpense={editingExpense}
+      />
+
+      <TablePrintModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title="Expense Report"
+        subtitle="Business expenses with applied date, category, and payment filters"
+        columns={printColumns}
+        data={filteredExpenses}
+        summaries={printSummaries}
+        filters={printFilters}
+        orientation="landscape"
       />
     </div>
   );

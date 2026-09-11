@@ -407,6 +407,58 @@ export const salesService = {
     }
   },
 
+  async update(id: string, sale: Partial<Sale>): Promise<Sale> {
+    const updateData: any = {}
+    if (sale.invoiceNumber !== undefined) updateData.invoice_number = sale.invoiceNumber
+    if (sale.customerId !== undefined) updateData.customer_id = sale.customerId
+    if (sale.customerName !== undefined) updateData.customer_name = sale.customerName
+    if (sale.items !== undefined) updateData.items = sale.items
+    if (sale.subtotal !== undefined) updateData.subtotal = sale.subtotal
+    if (sale.discountAmount !== undefined) updateData.discount_amount = sale.discountAmount
+    if (sale.taxAmount !== undefined) updateData.tax_amount = sale.taxAmount
+    if (sale.total !== undefined) updateData.total = sale.total
+    if (sale.paymentMethod !== undefined) updateData.payment_method = sale.paymentMethod
+    if (sale.payments !== undefined) updateData.payments = sale.payments
+    if (sale.cardDetails !== undefined) updateData.card_details = sale.cardDetails
+    if (sale.status !== undefined) updateData.status = sale.status
+    if (sale.cashier !== undefined) updateData.cashier = sale.cashier
+    if (sale.receiptNumber !== undefined) updateData.receipt_number = sale.receiptNumber
+    if (sale.notes !== undefined) updateData.notes = sale.notes
+    if (sale.appliedDiscounts !== undefined) updateData.applied_discounts = sale.appliedDiscounts
+    if (sale.freeGifts !== undefined) updateData.free_gifts = sale.freeGifts
+
+    const { data, error } = await supabase
+      .from('sales')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return {
+      id: data.id,
+      invoiceNumber: data.invoice_number,
+      customerId: data.customer_id || undefined,
+      customerName: data.customer_name || undefined,
+      items: data.items as any[],
+      subtotal: data.subtotal || 0,
+      discountAmount: data.discount_amount || 0,
+      taxAmount: data.tax_amount || 0,
+      total: data.total || 0,
+      paymentMethod: data.payment_method as any,
+      payments: data.payments as any,
+      cardDetails: data.card_details as any,
+      status: data.status as any,
+      cashier: data.cashier || '',
+      timestamp: new Date(data.created_at),
+      receiptNumber: data.receipt_number || undefined,
+      notes: data.notes || undefined,
+      appliedDiscounts: data.applied_discounts as any,
+      freeGifts: data.free_gifts as any
+    }
+  },
+
   async delete(id: string): Promise<void> {
     const { error } = await supabase
       .from('sales')

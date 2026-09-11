@@ -225,8 +225,8 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
 
   const totalAutoDiscount = appliedDiscounts.reduce((sum, discount) => sum + discount.discountAmount, 0);
   const totalDiscount = manualDiscount + totalAutoDiscount;
-  const taxAmount = (subtotal - totalDiscount) * (state.settings.taxRate / 100);
-  const total = subtotal - totalDiscount + taxAmount;
+  const taxAmount = 0;
+  const total = subtotal - totalDiscount;
   const change = parseFloat(amountPaid) - total;
 
   const paidSoFar = payments.reduce((s, p) => s + p.amount, 0);
@@ -564,10 +564,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       <span className="font-medium">-{state.settings.currency} {totalDiscount.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between">
-                    <span>Tax ({state.settings.taxRate}%):</span>
-                    <span className="font-medium">{state.settings.currency} {taxAmount.toFixed(2)}</span>
-                  </div>
                   <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
                     <span>Total:</span>
                     <span>{state.settings.currency} {total.toFixed(2)}</span>

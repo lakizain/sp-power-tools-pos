@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Search, Plus, Edit2, Trash2, Download, Filter, X,
   CalendarDays, CreditCard, Users, AlertCircle, KeyRound,
-  CheckCircle2, Clock, AlertTriangle, RotateCcw
+  CheckCircle2, Clock, AlertTriangle, RotateCcw, Printer, CalendarRange
 } from 'lucide-react';
 import { useApp, useFeatureToggles } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +11,8 @@ import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { RentalModal } from './RentalModal';
 import { ReturnModal } from '../returns/ReturnModal';
-import { format, isBefore, differenceInDays, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, isBefore, differenceInDays, startOfMonth, endOfMonth, isWithinInterval, subMonths, startOfWeek } from 'date-fns';
+import { TablePrintModal, PrintColumn, PrintSummary, PrintFilterInfo } from '../ui/TablePrintModal';
 
 export function RentalsManager() {
   const { state, dispatch } = useApp();
@@ -19,6 +20,10 @@ export function RentalsManager() {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<Rental['status'] | 'all'>('all');
+  const [datePreset, setDatePreset] = useState('all');
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState('');
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<Rental | null>(null);
   const [isReturnOpen, setIsReturnOpen] = useState(false);
@@ -49,7 +54,64 @@ export function RentalsManager() {
         searchTerm
       );
       const matchesStatus = statusFilter === 'all' || rental.computedStatus === statusFilter;
-      return matchesSearch && matchesStatus;
+
+      let matchesDate = true;
+      const targetDate = new Date(rental.createdAt);
+      if (datePreset === 'custom') {
+        if (customFromDate) {
+          const from = new Date(customFromDate);
+          from.setHours(0, 0, 0, 0);
+          matchesDate = matchesDate && targetDate >= from;
+        }
+        if (customToDate) {
+          const to = new Date(customToDate);
+          to.setHours(23, 59, 59, 999);
+          matchesDate = matchesDate && targetDate <= to;
+        }
+      } else if (datePreset !== 'all') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        switch (datePreset) {
+          case 'today': {
+            const tStart = new Date(today);
+            const tEnd = new Date(today);
+            tEnd.setHours(23, 59, 59, 999);
+            matchesDate = targetDate >= tStart && targetDate <= tEnd;
+            break;
+          }
+          case 'week': {
+            const ws = startOfWeek(today, { weekStartsOn: 1 });
+            const we = new Date();
+            we.setHours(23, 59, 59, 999);
+            matchesDate = targetDate >= ws && targetDate <= we;
+            break;
+          }
+          case 'month': {
+            matchesDate = targetDate >= startOfMonth(today) && targetDate <= endOfMonth(today);
+            break;
+          }
+          case 'last_month': {
+            const last = subMonths(today, 1);
+            matchesDate = targetDate >= startOfMonth(last) && targetDate <= endOfMonth(last);
+            break;
+          }
+          case 'last_3_months': {
+            const threeAgo = subMonths(today, 3);
+            const nowEnd = new Date();
+            nowEnd.setHours(23, 59, 59, 999);
+            matchesDate = targetDate >= startOfMonth(threeAgo) && targetDate <= nowEnd;
+            break;
+          }
+          case 'year': {
+            const ys = new Date(today.getFullYear(), 0, 1);
+            const ye = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+            matchesDate = targetDate >= ys && targetDate <= ye;
+            break;
+          }
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesDate;
     });
     const sorted = sortBySearchRelevance(
       filtered,
@@ -66,7 +128,7 @@ export function RentalsManager() {
       });
     }
     return sorted;
-  }, [state.rentals, searchTerm, statusFilter]);
+  }, [state.rentals, searchTerm, statusFilter, datePreset, customFromDate, customToDate]);
 
   const summary = useMemo(() => {
     const now = new Date();
@@ -242,6 +304,65 @@ export function RentalsManager() {
 
   const preparedForReturn = rentalForReturn ? renderRentalForReturn() : null;
 
+  const printColumns: PrintColumn<any>[] = [
+    { key: 'rentalNumber', header: 'Rental #', accessor: (r) => r.rentalNumber, width: '10%' },
+    { key: 'customer', header: 'Customer', accessor: (r) => r.customerName || '—', width: '15%' },
+    { key: 'items', header: 'Items', accessor: (r) => `${r.items.length} item${r.items.length !== 1 ? 's' : ''}`, width: '8%' },
+    { key: 'rentFrom', header: 'Rent From', accessor: (r) => format(new Date(r.rentFrom), 'yyyy-MM-dd'), width: '10%' },
+    { key: 'rentTo', header: 'Rent To', accessor: (r) => format(new Date(r.rentTo), 'yyyy-MM-dd'), width: '10%' },
+    { key: 'status', header: 'Status', accessor: (r) => {
+      const computed = (r as any).computedStatus;
+      return computed.charAt(0).toUpperCase() + computed.slice(1);
+    }, width: '9%' },
+    { key: 'totalRent', header: 'Total Rent', accessor: (r) => `${state.settings.currency} ${r.totalRent.toFixed(2)}`, width: '10%', align: 'right' },
+    { key: 'paid', header: 'Paid', accessor: (r) => `${state.settings.currency} ${r.paidAmount.toFixed(2)}`, width: '10%', align: 'right' },
+    { key: 'balance', header: 'Balance', accessor: (r) => `${state.settings.currency} ${(r as any).balance.toFixed(2)}`, width: '9%', align: 'right' },
+    { key: 'deposit', header: 'Deposit', accessor: (r) => `${state.settings.currency} ${r.securityDeposit.toFixed(2)}`, width: '9%', align: 'right' },
+  ];
+
+  const filteredSummary = useMemo(() => {
+    const totalRent = list.reduce((s, r) => s + r.totalRent, 0);
+    const totalPaid = list.reduce((s, r) => s + r.paidAmount, 0);
+    const totalDeposit = list.reduce((s, r) => s + r.securityDeposit, 0);
+    const totalBalance = list.reduce((s, r: any) => s + (r.balance || 0), 0);
+    const activeCount = list.filter((r: any) => r.computedStatus === 'active').length;
+    const overdueCount = list.filter((r: any) => r.computedStatus === 'overdue').length;
+    return { totalRent, totalPaid, totalDeposit, totalBalance, activeCount, overdueCount, count: list.length };
+  }, [list]);
+
+  const printSummaries: PrintSummary[] = [
+    { label: 'Total Rentals', value: String(filteredSummary.count), highlight: true },
+    { label: 'Total Rent', value: `${state.settings.currency} ${filteredSummary.totalRent.toFixed(2)}` },
+    { label: 'Collected', value: `${state.settings.currency} ${filteredSummary.totalPaid.toFixed(2)}` },
+    { label: 'Balance Due', value: `${state.settings.currency} ${filteredSummary.totalBalance.toFixed(2)}` },
+  ];
+
+  const getDateFilterLabel = (): string => {
+    switch (datePreset) {
+      case 'all': return 'All Rentals';
+      case 'today': return 'Created Today';
+      case 'week': return 'Created This Week';
+      case 'month': return 'Created This Month';
+      case 'last_month': return 'Created Last Month';
+      case 'last_3_months': return 'Last 3 Months';
+      case 'year': return 'Created This Year';
+      case 'custom':
+        if (customFromDate && customToDate) return `${customFromDate} → ${customToDate}`;
+        if (customFromDate) return `From ${customFromDate}`;
+        if (customToDate) return `Up to ${customToDate}`;
+        return 'Custom Range';
+      default: return 'All Rentals';
+    }
+  };
+
+  const statusFilterLabel = statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
+
+  const printFilters: PrintFilterInfo[] = [
+    { label: 'Date', value: getDateFilterLabel() },
+    ...(statusFilter !== 'all' ? [{ label: 'Status', value: statusFilterLabel }] : []),
+    ...(searchTerm ? [{ label: 'Search', value: searchTerm }] : []),
+  ];
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
@@ -252,13 +373,20 @@ export function RentalsManager() {
           </h1>
           <p className="text-gray-600 mt-1">Track rented items, customers, rental periods, and returns</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print PDF</span>
+          </button>
           <button
             onClick={exportData}
             className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
           >
             <Download className="h-4 w-4" />
-            <span>Export</span>
+            <span>Export CSV</span>
           </button>
           {canEdit && (
             <button
@@ -365,6 +493,45 @@ export function RentalsManager() {
               {s === 'all' ? `All (${summary.totalCount})` : s}
             </button>
           ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-gray-100">
+          <div className="md:col-span-1 relative">
+            <CalendarRange className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <select
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value)}
+              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent appearance-none text-sm"
+            >
+              <option value="all">📅 All Time</option>
+              <option value="today">🗓️ Created Today</option>
+              <option value="week">📆 Created This Week</option>
+              <option value="month">📊 Created This Month</option>
+              <option value="last_month">📅 Created Last Month</option>
+              <option value="last_3_months">📈 Last 3 Months</option>
+              <option value="year">🗃️ Created This Year</option>
+              <option value="custom">🎯 Custom Range...</option>
+            </select>
+          </div>
+          {datePreset === 'custom' && (
+            <>
+              <div>
+                <input
+                  type="date"
+                  value={customFromDate}
+                  onChange={(e) => setCustomFromDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <input
+                  type="date"
+                  value={customToDate}
+                  onChange={(e) => setCustomToDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -530,6 +697,18 @@ export function RentalsManager() {
           initialReturnMethod="rental_return"
         />
       )}
+
+      <TablePrintModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title="Product Rentals Report"
+        subtitle="Rental contracts, customers, periods, and financial status"
+        columns={printColumns}
+        data={list}
+        summaries={printSummaries}
+        filters={printFilters}
+        orientation="landscape"
+      />
     </div>
   );
 }

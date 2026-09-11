@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Printer, FolderPlus } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Filter, Printer, FolderPlus, CalendarRange, Download } from 'lucide-react';
 import { Product, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { ProductModal } from './ProductModal';
@@ -7,6 +7,8 @@ import { BarcodeStickerPrint } from './BarcodeStickerPrint';
 import { CategoryModal } from './CategoryModal';
 import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
+import { format, startOfMonth, endOfMonth, subMonths, startOfWeek } from 'date-fns';
+import { TablePrintModal, PrintColumn, PrintSummary, PrintFilterInfo } from '../ui/TablePrintModal';
 
 export function InventoryManager() {
   const { state } = useApp();
@@ -20,6 +22,11 @@ export function InventoryManager() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [dbCategories, setDbCategories] = useState<ProductCategory[]>([]);
+  const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
+  const [datePreset, setDatePreset] = useState('all');
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState('');
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const loadDbCategories = async () => {
     try {
@@ -40,7 +47,7 @@ export function InventoryManager() {
   const allCategoryNames = Array.from(new Set([...activeDbCategoryNames, ...productCategoryNames])).sort();
   const categories = ['All', ...allCategoryNames];
 
-  const filteredProducts = (() => {
+  const filteredProducts = useMemo(() => {
     const filtered = state.products
       .filter(product => {
         const matchesSearch = matchesAnyField(
@@ -54,7 +61,78 @@ export function InventoryManager() {
           searchTerm
         );
         const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-        return matchesSearch && matchesCategory;
+
+        let matchesStock = true;
+        if (stockFilter !== 'all') {
+          const trackInv = product.trackInventory !== false;
+          const isLow = trackInv && product.stock <= (product.minStock || 0);
+          const isOut = trackInv && product.stock === 0;
+          switch (stockFilter) {
+            case 'in_stock': matchesStock = !isOut; break;
+            case 'low_stock': matchesStock = isLow && !isOut; break;
+            case 'out_of_stock': matchesStock = isOut; break;
+          }
+        }
+
+        let matchesDate = true;
+        const createdDate = new Date(product.createdAt);
+        if (datePreset === 'custom') {
+          if (customFromDate) {
+            const from = new Date(customFromDate);
+            from.setHours(0, 0, 0, 0);
+            matchesDate = matchesDate && createdDate >= from;
+          }
+          if (customToDate) {
+            const to = new Date(customToDate);
+            to.setHours(23, 59, 59, 999);
+            matchesDate = matchesDate && createdDate <= to;
+          }
+        } else if (datePreset !== 'all') {
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          switch (datePreset) {
+            case 'today': {
+              const tStart = new Date(today);
+              const tEnd = new Date(today);
+              tEnd.setHours(23, 59, 59, 999);
+              matchesDate = createdDate >= tStart && createdDate <= tEnd;
+              break;
+            }
+            case 'week': {
+              const ws = startOfWeek(today, { weekStartsOn: 1 });
+              const we = new Date();
+              we.setHours(23, 59, 59, 999);
+              matchesDate = createdDate >= ws && createdDate <= we;
+              break;
+            }
+            case 'month': {
+              const ms = startOfMonth(today);
+              const me = endOfMonth(today);
+              matchesDate = createdDate >= ms && createdDate <= me;
+              break;
+            }
+            case 'last_month': {
+              const last = subMonths(today, 1);
+              matchesDate = createdDate >= startOfMonth(last) && createdDate <= endOfMonth(last);
+              break;
+            }
+            case 'last_3_months': {
+              const threeAgo = subMonths(today, 3);
+              const nowEnd = new Date();
+              nowEnd.setHours(23, 59, 59, 999);
+              matchesDate = createdDate >= startOfMonth(threeAgo) && createdDate <= nowEnd;
+              break;
+            }
+            case 'year': {
+              const ys = new Date(today.getFullYear(), 0, 1);
+              const ye = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+              matchesDate = createdDate >= ys && createdDate <= ye;
+              break;
+            }
+          }
+        }
+
+        return matchesSearch && matchesCategory && matchesStock && matchesDate;
       });
     const sortedByRelevance = sortBySearchRelevance(
       filtered,
@@ -96,7 +174,88 @@ export function InventoryManager() {
         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
       }
     });
-  })();
+  }, [state.products, searchTerm, selectedCategory, sortBy, sortOrder, stockFilter, datePreset, customFromDate, customToDate]);
+
+  const exportProducts = () => {
+    const csvContent = [
+      ['SKU', 'Product Name', 'Category', 'Price', 'Cost', 'Stock', 'Min Stock', 'Barcode', 'Track Inventory', 'Created'].join(','),
+      ...filteredProducts.map(p => [
+        p.sku,
+        `"${p.name.replace(/"/g, '""')}"`,
+        p.category,
+        p.price.toFixed(2),
+        p.cost.toFixed(2),
+        p.stock,
+        p.minStock,
+        p.barcode || '',
+        p.trackInventory ? 'Yes' : 'No',
+        format(new Date(p.createdAt), 'yyyy-MM-dd'),
+      ].join(','))
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const printColumns: PrintColumn<Product>[] = [
+    { key: 'sku', header: 'SKU', accessor: (p) => p.sku, width: '10%', align: 'left' },
+    { key: 'name', header: 'Product Name', accessor: (p) => p.name, width: '22%' },
+    { key: 'category', header: 'Category', accessor: (p) => p.category, width: '12%' },
+    { key: 'price', header: 'Price', accessor: (p) => `$ ${p.price.toFixed(2)}`, width: '9%', align: 'right' },
+    { key: 'cost', header: 'Cost', accessor: (p) => `$ ${p.cost.toFixed(2)}`, width: '9%', align: 'right' },
+    { key: 'stock', header: 'Stock', accessor: (p) => p.stock, width: '7%', align: 'right' },
+    { key: 'minStock', header: 'Min', accessor: (p) => p.minStock, width: '6%', align: 'right' },
+    { key: 'value', header: 'Stock Value', accessor: (p) => `$ ${(p.stock * p.cost).toFixed(2)}`, width: '11%', align: 'right' },
+    { key: 'barcode', header: 'Barcode', accessor: (p) => p.barcode || '-', width: '10%' },
+    { key: 'created', header: 'Created', accessor: (p) => format(new Date(p.createdAt), 'yyyy-MM-dd'), width: '4%' },
+  ];
+
+  const filterStats = useMemo(() => {
+    const totalCount = filteredProducts.length;
+    const low = filteredProducts.filter(p => p.trackInventory && p.stock <= p.minStock && p.stock > 0).length;
+    const out = filteredProducts.filter(p => p.trackInventory && p.stock === 0).length;
+    const invVal = filteredProducts.reduce((s, p) => s + (p.stock * p.cost), 0);
+    const totalValue = state.products.reduce((s: number, p: Product) => s + (p.stock * p.cost), 0);
+    return { totalCount, low, out, invVal, totalValue };
+  }, [filteredProducts, state.products]);
+
+  const printSummaries: PrintSummary[] = [
+    { label: 'Products (Filtered)', value: String(filterStats.totalCount), highlight: true },
+    { label: 'Low Stock', value: String(filterStats.low) },
+    { label: 'Out of Stock', value: String(filterStats.out) },
+    { label: 'Inventory Value', value: `$ ${filterStats.invVal.toFixed(2)}` },
+  ];
+
+  const getDateFilterLabel = (): string => {
+    switch (datePreset) {
+      case 'all': return 'All Time';
+      case 'today': return 'Created Today';
+      case 'week': return 'Created This Week';
+      case 'month': return 'Created This Month';
+      case 'last_month': return 'Created Last Month';
+      case 'last_3_months': return 'Created Last 3 Months';
+      case 'year': return 'Created This Year';
+      case 'custom':
+        if (customFromDate && customToDate) return `${customFromDate} → ${customToDate}`;
+        if (customFromDate) return `From ${customFromDate}`;
+        if (customToDate) return `Up to ${customToDate}`;
+        return 'Custom';
+      default: return 'All Time';
+    }
+  };
+
+  const stockFilterLabel = stockFilter === 'all' ? 'All' : stockFilter === 'in_stock' ? 'In Stock Only' : stockFilter === 'low_stock' ? 'Low Stock Only' : 'Out of Stock Only';
+
+  const printFilters: PrintFilterInfo[] = [
+    { label: 'Date Created', value: getDateFilterLabel() },
+    ...(selectedCategory !== 'All' ? [{ label: 'Category', value: selectedCategory }] : []),
+    ...(stockFilter !== 'all' ? [{ label: 'Stock Status', value: stockFilterLabel }] : []),
+    ...(searchTerm ? [{ label: 'Search', value: searchTerm }] : []),
+  ];
 
   const lowStockProducts = state.products.filter((p: Product) => p.trackInventory && p.stock <= p.minStock);
   const totalValue = state.products.reduce((sum: number, p: Product) => sum + (p.stock * p.cost), 0);
@@ -147,7 +306,21 @@ export function InventoryManager() {
           <p className="text-gray-600 mt-1">Manage your products and stock levels</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print PDF</span>
+          </button>
+          <button
+            onClick={exportProducts}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+          >
+            <Download className="h-4 w-4" />
+            <span>Export CSV</span>
+          </button>
           <button
             onClick={() => setShowCategoryModal(true)}
             className="btn btn-secondary btn-lg"
@@ -218,9 +391,9 @@ export function InventoryManager() {
 
       {/* Filters and Controls */}
       <div className="card p-4 lg:p-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0 gap-4">
-          <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 flex-1 w-full lg:w-auto">
-            <div className="relative flex-1 max-w-md">
+        <div className="space-y-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="relative flex-1 max-w-xl">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
                 type="text"
@@ -242,6 +415,17 @@ export function InventoryManager() {
             </select>
 
             <select
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value as any)}
+              className="select min-w-[150px]"
+            >
+              <option value="all">All Stock Status</option>
+              <option value="in_stock">📦 In Stock</option>
+              <option value="low_stock">⚠️ Low Stock</option>
+              <option value="out_of_stock">🔴 Out of Stock</option>
+            </select>
+
+            <select
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
                 const [field, order] = e.target.value.split('-');
@@ -257,6 +441,48 @@ export function InventoryManager() {
               <option value="price-asc">Price Low-High</option>
               <option value="price-desc">Price High-Low</option>
             </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <CalendarRange className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <select
+                value={datePreset}
+                onChange={(e) => setDatePreset(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm"
+              >
+                <option value="all">📅 All Products (No Date Filter)</option>
+                <option value="today">🗓️ Created Today</option>
+                <option value="week">📆 Created This Week</option>
+                <option value="month">📊 Created This Month</option>
+                <option value="last_month">📅 Created Last Month</option>
+                <option value="last_3_months">📈 Last 3 Months</option>
+                <option value="year">🗃️ Created This Year</option>
+                <option value="custom">🎯 Custom Date Range...</option>
+              </select>
+            </div>
+            {datePreset === 'custom' && (
+              <>
+                <div>
+                  <input
+                    type="date"
+                    value={customFromDate}
+                    onChange={(e) => setCustomFromDate(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="From (Created)"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="date"
+                    value={customToDate}
+                    onChange={(e) => setCustomToDate(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="To (Created)"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -380,6 +606,18 @@ export function InventoryManager() {
         onCategoriesChanged={() => {
           loadDbCategories();
         }}
+      />
+
+      <TablePrintModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title="Inventory Product List"
+        subtitle="Products with applied filters and stock information"
+        columns={printColumns}
+        data={filteredProducts}
+        summaries={printSummaries}
+        filters={printFilters}
+        orientation="landscape"
       />
     </div>
   );

@@ -173,10 +173,6 @@ export function ReceiptPrint({ sale, onClose }: ReceiptPrintProps) {
                 ))}
               </div>
             )}
-            <div className="flex justify-between text-sm">
-              <span>Tax ({state.settings.taxRate}%):</span>
-              <span>{state.settings.currency} {sale.taxAmount.toFixed(2)}</span>
-            </div>
             <div className="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
               <span>Total:</span>
               <span>{state.settings.currency} {sale.total.toFixed(2)}</span>

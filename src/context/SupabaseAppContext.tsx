@@ -67,6 +67,7 @@ type AppAction =
   | { type: 'SET_SELECTED_CUSTOMER'; payload: Customer | null }
   | { type: 'SET_SALES'; payload: Sale[] }
   | { type: 'ADD_SALE'; payload: Sale }
+  | { type: 'UPDATE_SALE'; payload: Sale }
   | { type: 'DELETE_SALE'; payload: string }
   | { type: 'SET_USERS'; payload: User[] }
   | { type: 'SET_SETTINGS'; payload: Partial<AppSettings> }
@@ -203,6 +204,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         sales: [...state.sales, action.payload],
+      };
+    case 'UPDATE_SALE':
+      return {
+        ...state,
+        sales: state.sales.map(sale => sale.id === action.payload.id ? action.payload : sale),
       };
     case 'DELETE_SALE':
       return {

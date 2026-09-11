@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Search, Plus, Edit2, Trash2, Download, Filter, X,
   DollarSign, AlertTriangle, CheckCircle2, Clock,
-  CalendarDays, CreditCard, Users, AlertCircle
+  CalendarDays, CreditCard, Users, AlertCircle, Printer, CalendarRange
 } from 'lucide-react';
 import { useApp, useFeatureToggles } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -10,7 +10,8 @@ import { OutstandingPayment, PaymentRecord } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { PaymentModal } from './PaymentModal';
-import { format, isBefore, isToday, differenceInDays } from 'date-fns';
+import { format, isBefore, isToday, differenceInDays, startOfMonth, endOfMonth, subMonths, startOfWeek } from 'date-fns';
+import { TablePrintModal, PrintColumn, PrintSummary, PrintFilterInfo } from '../ui/TablePrintModal';
 
 export function OutstandingPayments() {
   const { state, dispatch } = useApp();
@@ -19,6 +20,11 @@ export function OutstandingPayments() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [overdueFilter, setOverdueFilter] = useState('all');
+  const [datePreset, setDatePreset] = useState('all');
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState('');
+  const [dateField, setDateField] = useState<'issue' | 'due'>('issue');
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editing, setEditing] = useState<OutstandingPayment | null>(null);
   const [paymentFor, setPaymentFor] = useState<OutstandingPayment | null>(null);
@@ -58,7 +64,66 @@ export function OutstandingPayments() {
         overdueFilter === 'all' ||
         (overdueFilter === 'overdue' && op.isOverdue) ||
         (overdueFilter === 'due_today' && isToday(new Date(op.dueDate)) && op.status !== 'paid');
-      return matchesSearch && matchesStatus && matchesOverdue;
+
+      let matchesDate = true;
+      const targetDate = new Date(dateField === 'issue' ? op.issueDate : op.dueDate);
+      if (datePreset === 'custom') {
+        if (customFromDate) {
+          const from = new Date(customFromDate);
+          from.setHours(0, 0, 0, 0);
+          matchesDate = matchesDate && targetDate >= from;
+        }
+        if (customToDate) {
+          const to = new Date(customToDate);
+          to.setHours(23, 59, 59, 999);
+          matchesDate = matchesDate && targetDate <= to;
+        }
+      } else if (datePreset !== 'all') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        switch (datePreset) {
+          case 'today': {
+            const tStart = new Date(today);
+            const tEnd = new Date(today);
+            tEnd.setHours(23, 59, 59, 999);
+            matchesDate = targetDate >= tStart && targetDate <= tEnd;
+            break;
+          }
+          case 'week': {
+            const ws = startOfWeek(today, { weekStartsOn: 1 });
+            const we = new Date();
+            we.setHours(23, 59, 59, 999);
+            matchesDate = targetDate >= ws && targetDate <= we;
+            break;
+          }
+          case 'month': {
+            const ms = startOfMonth(today);
+            const me = endOfMonth(today);
+            matchesDate = targetDate >= ms && targetDate <= me;
+            break;
+          }
+          case 'last_month': {
+            const last = subMonths(today, 1);
+            matchesDate = targetDate >= startOfMonth(last) && targetDate <= endOfMonth(last);
+            break;
+          }
+          case 'last_3_months': {
+            const threeAgo = subMonths(today, 3);
+            const nowEnd = new Date();
+            nowEnd.setHours(23, 59, 59, 999);
+            matchesDate = targetDate >= startOfMonth(threeAgo) && targetDate <= nowEnd;
+            break;
+          }
+          case 'year': {
+            const ys = new Date(today.getFullYear(), 0, 1);
+            const ye = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+            matchesDate = targetDate >= ys && targetDate <= ye;
+            break;
+          }
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesOverdue && matchesDate;
     });
     const sorted = sortBySearchRelevance(
       filtered,
@@ -72,7 +137,7 @@ export function OutstandingPayments() {
       });
     }
     return sorted;
-  }, [state.outstandingPayments, searchTerm, statusFilter, overdueFilter]);
+  }, [state.outstandingPayments, searchTerm, statusFilter, overdueFilter, datePreset, customFromDate, customToDate, dateField]);
 
   const summary = useMemo(() => {
     const total = state.outstandingPayments.reduce((s, o) => s + o.totalAmount, 0);
@@ -239,6 +304,66 @@ export function OutstandingPayments() {
     );
   };
 
+  const printColumns: PrintColumn<any>[] = [
+    { key: 'invoice', header: 'Invoice #', accessor: (op) => op.invoiceNumber, width: '12%' },
+    { key: 'customer', header: 'Customer', accessor: (op) => op.customerName, width: '18%' },
+    { key: 'issue', header: 'Issue Date', accessor: (op) => format(new Date(op.issueDate), 'yyyy-MM-dd'), width: '10%' },
+    { key: 'due', header: 'Due Date', accessor: (op) => format(new Date(op.dueDate), 'yyyy-MM-dd'), width: '10%' },
+    { key: 'total', header: 'Total', accessor: (op) => `${state.settings.currency} ${op.totalAmount.toFixed(2)}`, width: '10%', align: 'right' },
+    { key: 'paid', header: 'Paid', accessor: (op) => `${state.settings.currency} ${op.paidAmount.toFixed(2)}`, width: '10%', align: 'right' },
+    { key: 'os', header: 'Outstanding', accessor: (op) => `${state.settings.currency} ${op.outstandingAmount.toFixed(2)}`, width: '11%', align: 'right' },
+    { key: 'status', header: 'Status', accessor: (op) => {
+      const s: any = op;
+      const realStatus = (s.isOverdue && op.status !== 'paid') ? 'overdue' : op.status;
+      return realStatus.charAt(0).toUpperCase() + realStatus.slice(1);
+    }, width: '9%' },
+    { key: 'payments', header: 'Payments', accessor: (op) => `${op.paymentHistory?.length || 0} record${(op.paymentHistory?.length || 0) !== 1 ? 's' : ''}`, width: '10%' },
+  ];
+
+  const filteredSummary = useMemo(() => {
+    const total = list.reduce((s, o) => s + o.totalAmount, 0);
+    const paid = list.reduce((s, o) => s + o.paidAmount, 0);
+    const overdueCount = list.filter((o: any) => o.isOverdue).length;
+    const overdueAmount = list.filter((o: any) => o.isOverdue).reduce((s: number, o: any) => s + o.outstandingAmount, 0);
+    return { total, paid, outstanding: total - paid, overdueCount, overdueAmount, count: list.length };
+  }, [list]);
+
+  const printSummaries: PrintSummary[] = [
+    { label: 'Invoices', value: String(filteredSummary.count), highlight: true },
+    { label: 'Total Amount', value: `${state.settings.currency} ${filteredSummary.total.toFixed(2)}` },
+    { label: 'Paid', value: `${state.settings.currency} ${filteredSummary.paid.toFixed(2)}` },
+    { label: 'Outstanding', value: `${state.settings.currency} ${filteredSummary.outstanding.toFixed(2)}` },
+  ];
+
+  const getDateFilterLabel = (): string => {
+    const field = dateField === 'issue' ? '(Issue)' : '(Due)';
+    switch (datePreset) {
+      case 'all': return `All Time ${field}`;
+      case 'today': return `Today ${field}`;
+      case 'week': return `This Week ${field}`;
+      case 'month': return `This Month ${field}`;
+      case 'last_month': return `Last Month ${field}`;
+      case 'last_3_months': return `Last 3 Months ${field}`;
+      case 'year': return `This Year ${field}`;
+      case 'custom':
+        if (customFromDate && customToDate) return `${field} ${customFromDate} → ${customToDate}`;
+        if (customFromDate) return `${field} From ${customFromDate}`;
+        if (customToDate) return `${field} Up to ${customToDate}`;
+        return `Custom ${field}`;
+      default: return `All Time ${field}`;
+    }
+  };
+
+  const overdueFilterLabel = overdueFilter === 'all' ? 'All' : overdueFilter === 'due_today' ? 'Due Today Only' : 'Overdue Only';
+  const statusFilterLabel = statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
+
+  const printFilters: PrintFilterInfo[] = [
+    { label: 'Date', value: getDateFilterLabel() },
+    ...(statusFilter !== 'all' ? [{ label: 'Status', value: statusFilterLabel }] : []),
+    ...(overdueFilter !== 'all' ? [{ label: 'Overdue', value: overdueFilterLabel }] : []),
+    ...(searchTerm ? [{ label: 'Search', value: searchTerm }] : []),
+  ];
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-4 lg:space-y-0">
@@ -246,13 +371,20 @@ export function OutstandingPayments() {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Outstanding Payments</h1>
           <p className="text-gray-600 mt-1">Track customer credit, due invoices, and payment history</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Print PDF</span>
+          </button>
           <button
             onClick={exportData}
             className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
           >
             <Download className="h-4 w-4" />
-            <span>Export</span>
+            <span>Export CSV</span>
           </button>
           <button
             onClick={() => { if (!canEdit) { swalConfig.error('Permission denied.'); return; } setEditing(null); resetAddForm(); setIsAddOpen(true); }}
@@ -321,7 +453,7 @@ export function OutstandingPayments() {
         </div>
       </div>
 
-      <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm">
+      <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
             <div className="relative">
@@ -363,6 +495,57 @@ export function OutstandingPayments() {
               </select>
             </div>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <select
+              value={dateField}
+              onChange={(e) => setDateField(e.target.value as any)}
+              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm"
+            >
+              <option value="issue">Filter by Issue Date</option>
+              <option value="due">Filter by Due Date</option>
+            </select>
+          </div>
+          <div className="relative">
+            <CalendarRange className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <select
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value)}
+              className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm"
+            >
+              <option value="all">📅 All Time</option>
+              <option value="today">🗓️ Today</option>
+              <option value="week">📆 This Week</option>
+              <option value="month">📊 This Month</option>
+              <option value="last_month">📅 Last Month</option>
+              <option value="last_3_months">📈 Last 3 Months</option>
+              <option value="year">🗃️ This Year</option>
+              <option value="custom">🎯 Custom Range...</option>
+            </select>
+          </div>
+          {datePreset === 'custom' && (
+            <>
+              <div>
+                <input
+                  type="date"
+                  value={customFromDate}
+                  onChange={(e) => setCustomFromDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+              <div>
+                <input
+                  type="date"
+                  value={customToDate}
+                  onChange={(e) => setCustomToDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -563,6 +746,18 @@ export function OutstandingPayments() {
         onClose={() => setPaymentFor(null)}
         onSave={handlePaymentSaved}
         outstanding={paymentFor}
+      />
+
+      <TablePrintModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        title="Outstanding Payments Report"
+        subtitle="Customer invoices, due dates, and payment balances"
+        columns={printColumns}
+        data={list}
+        summaries={printSummaries}
+        filters={printFilters}
+        orientation="landscape"
       />
     </div>
   );

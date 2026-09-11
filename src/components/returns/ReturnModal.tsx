@@ -147,15 +147,15 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, it) => sum + it.subtotal, 0);
-    const taxAmount = Number((subtotal * (state.settings.taxRate || 0) / 100).toFixed(2));
-    const computedTotal = Number((subtotal + taxAmount).toFixed(2));
+    const taxAmount = 0;
+    const computedTotal = Number(subtotal.toFixed(2));
     return {
       subtotal: isRentalReturn ? 0 : subtotal,
-      taxAmount: isRentalReturn ? 0 : taxAmount,
+      taxAmount: 0,
       totalRefund: isRentalReturn ? 0 : computedTotal,
       rawSubtotal: subtotal,
     };
-  }, [items, state.settings.taxRate, isRentalReturn]);
+  }, [items, isRentalReturn]);
 
   const handleSubmit = async () => {
     const itemsWithQty = items.filter(i => i.quantity > 0 && i.productName.trim());
@@ -420,12 +420,6 @@ export function ReturnModal({ isOpen, onClose, onSave, editingReturn, fromSale, 
                   <span className="text-gray-600">Items Subtotal:</span>
                   <span className="font-medium">{state.settings.currency} {totals.subtotal.toFixed(2)}</span>
                 </div>
-                {state.settings.taxRate > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax ({state.settings.taxRate}%):</span>
-                    <span className="font-medium">{state.settings.currency} {totals.taxAmount.toFixed(2)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-amber-200/60">
                   <span>Total Refund:</span>
                   <span className="text-amber-700">{state.settings.currency} {totals.totalRefund.toFixed(2)}</span>

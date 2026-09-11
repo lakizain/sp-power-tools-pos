@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { salesService } from '../../lib/services';
 import { swalConfig } from '../../lib/sweetAlert';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
+import { toValidEan13, isValidEan13 } from '../../lib/barcodeUtils';
 import Swal from 'sweetalert2';
 
 export function POSTerminal() {
@@ -64,10 +65,32 @@ export function POSTerminal() {
     }
   }, [state.cart, state.activeSalesTab, dispatch]);
 
-  const handleBarcodeScan = useCallback((barcode: string) => {
-    const product = state.products.find(
-      (p: Product) => p.barcode === barcode || p.sku === barcode
+  const handleBarcodeScan = useCallback((rawBarcode: string) => {
+    const trimmed = rawBarcode.trim();
+    const normalizedEan = toValidEan13(trimmed);
+    const cleanedBarcode = trimmed.replace(/\D/g, '');
+
+    let product: Product | undefined = state.products.find(
+      (p: Product) => {
+        const pBarcode = p.barcode || '';
+        const pSku = p.sku || '';
+        const pBarcodeClean = pBarcode.replace(/\D/g, '');
+        return (
+          pBarcode === trimmed ||
+          pSku.toLowerCase() === trimmed.toLowerCase() ||
+          pBarcode === normalizedEan ||
+          pBarcodeClean === cleanedBarcode ||
+          pBarcodeClean === normalizedEan.replace(/\D/g, '') ||
+          (isValidEan13(pBarcode) && pBarcodeClean === normalizedEan.replace(/\D/g, '')) ||
+          (cleanedBarcode.length >= 6 && pBarcodeClean.endsWith(cleanedBarcode.slice(-pBarcodeClean.length))) ||
+          (cleanedBarcode.length >= 6 && pBarcodeClean === cleanedBarcode.slice(-pBarcodeClean.length))
+        );
+      }
     );
+
+    if (!product && isValidEan13(normalizedEan)) {
+      product = state.products.find((p: Product) => (p.barcode || '') === normalizedEan);
+    }
 
     if (product) {
       if (product.isWeightBased) {
@@ -83,7 +106,7 @@ export function POSTerminal() {
         addToCartFromScanner(product);
         Swal.fire({
           title: 'Added!',
-          html: `<strong>${product.name}</strong><br/>SKU: ${product.sku}`,
+          html: `<strong>${product.name}</strong><br/>SKU: ${product.sku}<br/>Barcode: ${product.barcode || 'N/A'}`,
           icon: 'success',
           toast: true,
           position: 'top-end',
@@ -95,7 +118,7 @@ export function POSTerminal() {
     } else {
       Swal.fire({
         title: 'Product Not Found',
-        html: `No product found for barcode:<br/><strong>${barcode}</strong><br/><br/>Please add this product in Inventory Management first.`,
+        html: `No product found for barcode:<br/><strong>${trimmed}</strong><br/>Normalized (EAN-13): <strong>${normalizedEan}</strong><br/><br/>Please add this product in Inventory Management first.`,
         icon: 'warning',
         confirmButtonText: 'OK',
         confirmButtonColor: '#3b82f6',
@@ -230,8 +253,8 @@ export function POSTerminal() {
         return sum + (price * item.quantity);
       }, 0);
       const totalDiscount = state.cart.reduce((sum, item) => sum + (item.discount || 0), 0);
-      const taxAmount = (subtotal - totalDiscount) * (state.settings.taxRate / 100);
-      const total = subtotal - totalDiscount + taxAmount;
+      const taxAmount = 0;
+      const total = subtotal - totalDiscount;
 
       const draftSale: Omit<Sale, 'id'> = {
         invoiceNumber: `DRAFT-${Date.now().toString().slice(-6)}`,

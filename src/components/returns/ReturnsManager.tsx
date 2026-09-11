@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ProductReturn, Sale, CartItem } from '../../types';
 import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
+import { returnsService, productsService } from '../../lib/services';
 import { ReturnModal } from './ReturnModal';
 import { format } from 'date-fns';
 
@@ -118,19 +119,49 @@ export function ReturnsManager() {
     }
   };
 
-  const handleSave = (r: ProductReturn) => {
-    if (editingReturn) {
-      dispatch({ type: 'UPDATE_RETURN', payload: r });
-      swalConfig.success('Return updated successfully.');
-    } else {
-      dispatch({ type: 'ADD_RETURN', payload: r });
-      swalConfig.success('Return recorded successfully.');
+  const handleSave = async (r: ProductReturn) => {
+    try {
+      swalConfig.loading(editingReturn ? 'Updating return...' : 'Saving return...');
+      let saved: ProductReturn;
+      if (editingReturn) {
+        saved = await returnsService.update(editingReturn.id, r);
+        dispatch({ type: 'UPDATE_RETURN', payload: saved });
+      } else {
+        saved = await returnsService.create(r);
+        dispatch({ type: 'ADD_RETURN', payload: saved });
+      }
+
+      if (r.restocked && r.status === 'completed') {
+        for (const ri of r.items) {
+          const product = state.products.find(p => p.id === ri.productId);
+          if (product && product.trackInventory && ri.quantity > 0) {
+            const qtyToAdd = Number(ri.quantity || 0);
+            const updatedProduct: any = {
+              ...product,
+              stock: product.stock + qtyToAdd,
+              updatedAt: new Date(),
+            };
+            try {
+              await productsService.update(product.id, updatedProduct);
+            } catch (e) {
+            }
+            dispatch({ type: 'UPDATE_PRODUCT', payload: updatedProduct });
+          }
+        }
+      }
+
+      swalConfig.close();
+      swalConfig.success(editingReturn ? 'Return updated successfully.' : 'Return recorded successfully.');
+      setIsModalOpen(false);
+      setEditingReturn(null);
+      setFromSale(null);
+      setSearchedBill(null);
+      setBillSearchTerm('');
+    } catch (e: any) {
+      console.error(e);
+      swalConfig.close();
+      swalConfig.error('Failed to save return: ' + (e.message || 'Unknown error'));
     }
-    setIsModalOpen(false);
-    setEditingReturn(null);
-    setFromSale(null);
-    setSearchedBill(null);
-    setBillSearchTerm('');
   };
 
   const handleBillSearch = () => {
