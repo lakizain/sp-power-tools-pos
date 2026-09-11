@@ -54,40 +54,41 @@ const THERMAL_CONFIG = {
    */
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
-  marginTopMm: 0.8,
-  marginBottomMm: 2.0,
+  marginTopMm: 1.0,
+  marginBottomMm: 1.0,
 
   companyNameHeightMm: 2.4,
 
-  productNameBaseHeightMm: 2.8,
+  productNameBaseHeightMm: 3.2,
   productNameMaxLines: 2,
 
-  priceHeightMm: 3.2,
+  priceHeightMm: 3.3,
 
   /**
    * Barcode number area.
    */
-  barcodeNumberHeightMm: 2.6,
+  barcodeNumberHeightMm: 2.8,
 
   /**
    * Small vertical gaps to maximize usable sticker area.
    */
-  gapMm: 0.2,
+  gapMm: 0.25,
 
   /**
-   * 34mm barcode inside 36mm content area,
-   * with safe margins for Xprinter tear-off tolerance.
+   * 35mm barcode inside 36mm content area.
+   *
+   * Do NOT use 37mm here because the content width is only 36mm.
    */
-  barcodeWidthMm: 34.0,
+  barcodeWidthMm: 34.8,
 
-  barcodeMinHeightMm: 8.5,
-  barcodeMaxHeightMm: 9.5,
+  barcodeMinHeightMm: 8.2,
+  barcodeMaxHeightMm: 8.8,
 
-  companyNameFontSizePt: 6.5,
-  productNameFontSizePt: 7.2,
-  productNameFontSizeSmallPt: 6.5,
-  priceFontSizePt: 9.0,
-  barcodeNumberFontSizePt: 6.5,
+  companyNameFontSizePt: 8.0,
+  productNameFontSizePt: 8.4,
+  productNameFontSizeSmallPt: 7.4,
+  priceFontSizePt: 10.5,
+  barcodeNumberFontSizePt: 7.2,
 } as const;
 
 const THERMAL_ROLL_CONFIG = {
@@ -694,25 +695,17 @@ export function BarcodeStickerPrint({
    * ============================================================
    * FORMAT PRICE
    * ============================================================
-   *
-   * Thermal labels follow the example (no decimals) so that
-   * "LKR. 8,960" stays inside the narrow 38mm sticker.
    */
   const formatPrice = (
     n: number
   ) => {
-    const decimals =
-      mode === 'thermal'
-        ? {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-          }
-        : {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          };
-
-    return `${currency}. ${n.toLocaleString('en-US', decimals)}`;
+    return `${currency}. ${n.toLocaleString(
+      'en-US',
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }
+    )}`;
   };
 
   /**
@@ -1886,7 +1879,7 @@ function StickerContent({
 
           width: Math.max(
             1,
-            Math.floor(widthPx / 64)
+            Math.floor(widthPx / 180)
           ),
 
           height: heightPx,
