@@ -558,8 +558,6 @@ export function BarcodeStickerPrint({
   useEffect(() => {
     if (isOpen && product) {
       setMode('thermal');
-      const stockVal = product.stock && product.stock > 0 ? product.stock : 1;
-      setCopies(Math.min(500, stockVal));
     }
   }, [isOpen, product]);
 
