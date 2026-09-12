@@ -52,6 +52,9 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
   const lastScanKeyTimeRef = useRef<number>(0);
   const barcodePreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const stickerCountRef = useRef<number>(1);
+  const lastWeightBasedClickRef = useRef<number>(0);
+  const lastTrackInventoryClickRef = useRef<number>(0);
+  const CHECKBOX_COOLDOWN_MS = 300;
 
   const existingProductBySku = useMemo<Product | null>(() => {
     if (product) return null;
@@ -438,6 +441,20 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
       }
       return next;
     });
+    if (!product && name === 'category' && value.trim()) {
+      setTimeout(() => handleGenerateBarcode(), 0);
+    }
+  };
+
+  const handleDebouncedCheckbox = (
+    e: React.ChangeEvent<HTMLInputElement>, field: 'isWeightBased' | 'trackInventory', lastClickRef: React.MutableRefObject<number>) => {
+    const now = Date.now();
+    if (now - lastClickRef.current < CHECKBOX_COOLDOWN_MS) {
+      e.preventDefault();
+      return;
+    }
+    lastClickRef.current = now;
+    handleChange(e);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -615,6 +632,9 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                             setFormData(prev => ({ ...prev, category: '' }));
                           } else {
                             setFormData(prev => ({ ...prev, category: e.target.value }));
+                            if (!product && e.target.value) {
+                              setTimeout(() => handleGenerateBarcode(), 0);
+                            }
                           }
                         }}
                         className="select flex-1"
@@ -744,12 +764,12 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                   type="checkbox"
                   name="isWeightBased"
                   checked={formData.isWeightBased}
-                  onChange={handleChange}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
+                  onChange={(e) => handleDebouncedCheckbox(e, 'isWeightBased', lastWeightBasedClickRef)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5 cursor-pointer"
                 />
                 <div className="flex items-center space-x-2">
                   <Scale className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700">Weight-based pricing</span>
+                  <span className="text-sm font-medium text-gray-700 select-none cursor-pointer">Weight-based pricing</span>
                 </div>
               </label>
             </div>
@@ -845,11 +865,11 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                   type="checkbox"
                   name="trackInventory"
                   checked={formData.trackInventory}
-                  onChange={handleChange}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
+                  onChange={(e) => handleDebouncedCheckbox(e, 'trackInventory', lastTrackInventoryClickRef)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5 cursor-pointer"
                 />
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium text-gray-700">Track inventory for this product</span>
+                  <span className="text-sm font-medium text-gray-700 select-none cursor-pointer">Track inventory for this product</span>
                 </div>
               </label>
               <p className="text-xs text-gray-500 mt-1 ml-8">
