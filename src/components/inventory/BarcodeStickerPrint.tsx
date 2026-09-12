@@ -553,7 +553,15 @@ export function BarcodeStickerPrint({
     useState(1);
 
   const [mode, setMode] =
-    useState<PrintMode>('a4grid');
+    useState<PrintMode>('thermal');
+
+  useEffect(() => {
+    if (isOpen && product) {
+      setMode('thermal');
+      const stockVal = product.stock && product.stock > 0 ? product.stock : 1;
+      setCopies(Math.min(500, stockVal));
+    }
+  }, [isOpen, product]);
 
   /**
    * ============================================================

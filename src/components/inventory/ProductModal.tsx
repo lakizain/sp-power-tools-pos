@@ -424,6 +424,18 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
           next.price = suggested.toString();
         }
       }
+      if (!product && name === 'stock') {
+        const stockNum = parseInt(value);
+        if (!isNaN(stockNum) && stockNum >= 0) {
+          if (stockNum === 1) {
+            next.minStock = '1';
+          } else if (stockNum === 0) {
+            next.minStock = '0';
+          } else {
+            next.minStock = Math.floor(stockNum / 2).toString();
+          }
+        }
+      }
       return next;
     });
   };
