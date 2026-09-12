@@ -264,7 +264,7 @@ export function TransactionsManager() {
       return sorted.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     }
     return sorted;
-  }, [state.sales, searchTerm, statusFilter, paymentFilter, dateFilter]);
+  }, [state.sales, searchTerm, statusFilter, paymentFilter, datePreset, customFromDate, customToDate]);
 
   const totalRevenue = filteredTransactions.reduce((sum, sale) => sum + sale.total, 0);
   const totalTransactions = filteredTransactions.length;
