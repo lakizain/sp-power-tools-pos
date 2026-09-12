@@ -19,7 +19,7 @@ export function InventoryManager() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showStickerPrint, setShowStickerPrint] = useState(false);
   const [stickerPrintProduct, setStickerPrintProduct] = useState<Product | null>(null);
-  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'price'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'price' | 'createdAt'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [dbCategories, setDbCategories] = useState<ProductCategory[]>([]);
@@ -167,6 +167,10 @@ export function InventoryManager() {
         case 'price':
           aValue = a.price;
           bValue = b.price;
+          break;
+        case 'createdAt':
+          aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           break;
         default:
           aValue = a.name.toLowerCase();
@@ -498,11 +502,13 @@ export function InventoryManager() {
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
                 const [field, order] = e.target.value.split('-');
-                setSortBy(field as 'name' | 'stock' | 'price');
+                setSortBy(field as 'name' | 'stock' | 'price' | 'createdAt');
                 setSortOrder(order as 'asc' | 'desc');
               }}
               className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
             >
+              <option value="createdAt-desc">🕒 Recently Added</option>
+              <option value="createdAt-asc">🕒 Oldest First</option>
               <option value="name-asc">Name A-Z</option>
               <option value="name-desc">Name Z-A</option>
               <option value="stock-asc">Stock Low-High</option>

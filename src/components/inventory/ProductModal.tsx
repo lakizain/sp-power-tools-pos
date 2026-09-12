@@ -56,6 +56,16 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
   const lastTrackInventoryClickRef = useRef<number>(0);
   const CHECKBOX_COOLDOWN_MS = 300;
 
+  const lastAddedProduct = useMemo<Product | null>(() => {
+    if (state.products.length === 0) return null;
+    const sorted = [...state.products].sort((a, b) => {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bDate - aDate;
+    });
+    return sorted[0];
+  }, [state.products]);
+
   const existingProductBySku = useMemo<Product | null>(() => {
     if (product) return null;
     const skuTrimmed = formData.sku.trim();
@@ -522,9 +532,21 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
     <div className="modal-overlay">
       <div className="modal max-w-4xl">
         <div className="modal-header">
-          <h2 className="text-xl font-bold text-gray-900">
-            {product ? 'Edit Product' : 'Add New Product'}
-          </h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-xl font-bold text-gray-900">
+              {product ? 'Edit Product' : 'Add New Product'}
+            </h2>
+            {!product && lastAddedProduct && (
+              <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                  ✅ Last Added
+                </span>
+                <span className="font-mono font-semibold text-gray-700">{lastAddedProduct.sku}</span>
+                <span className="text-gray-400">·</span>
+                <span className="font-medium text-gray-700 truncate max-w-xs">{lastAddedProduct.name}</span>
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-colors"
