@@ -29,7 +29,7 @@ type CurrencyAction =
 const initialState: CurrencyState = {
     supportedCurrencies: [],
     baseCurrency: null,
-    displayCurrency: 'USD',
+    displayCurrency: 'LKR',
     exchangeRates: [],
     isLoading: false,
     error: null,
@@ -95,7 +95,7 @@ interface CurrencyProviderProps {
     initialDisplayCurrency?: string;
 }
 
-export function CurrencyProvider({ children, initialDisplayCurrency = 'USD' }: CurrencyProviderProps) {
+export function CurrencyProvider({ children, initialDisplayCurrency = 'LKR' }: CurrencyProviderProps) {
     const [state, dispatch] = useReducer(currencyReducer, {
         ...initialState,
         displayCurrency: initialDisplayCurrency,
@@ -275,13 +275,13 @@ export function useCurrencyConversion() {
     const { convertAmount, getCurrentRate, state } = useCurrency();
 
     const convert = async (amount: number, fromCurrency?: string, toCurrency?: string) => {
-        const from = fromCurrency || (state.baseCurrency?.code || 'USD');
+        const from = fromCurrency || (state.baseCurrency?.code || 'LKR');
         const to = toCurrency || state.displayCurrency;
         return await convertAmount(amount, from, to);
     };
 
     const getRate = async (baseCurrency?: string, targetCurrency?: string) => {
-        const base = baseCurrency || (state.baseCurrency?.code || 'USD');
+        const base = baseCurrency || (state.baseCurrency?.code || 'LKR');
         const target = targetCurrency || state.displayCurrency;
         return await getCurrentRate(base, target);
     };

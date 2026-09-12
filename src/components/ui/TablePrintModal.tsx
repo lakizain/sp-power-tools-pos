@@ -87,7 +87,7 @@ export function TablePrintModal<T>({
   const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
 
   const storeName = state.settings.storeName || 'Business Report';
-  const currency = state.settings.currency || 'Rs.';
+  const currency = state.settings.currency || 'LKR';
   const generatedAt = format(new Date(), 'yyyy-MM-dd HH:mm');
 
   const handlePrint = () => {

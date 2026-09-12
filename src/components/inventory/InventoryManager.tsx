@@ -209,11 +209,11 @@ export function InventoryManager() {
     { key: 'sku', header: 'SKU', accessor: (p) => p.sku, width: '10%', align: 'left' },
     { key: 'name', header: 'Product Name', accessor: (p) => p.name, width: '22%' },
     { key: 'category', header: 'Category', accessor: (p) => p.category, width: '12%' },
-    { key: 'price', header: 'Price', accessor: (p) => `$ ${p.price.toFixed(2)}`, width: '9%', align: 'right' },
-    { key: 'cost', header: 'Cost', accessor: (p) => `$ ${p.cost.toFixed(2)}`, width: '9%', align: 'right' },
+    { key: 'price', header: 'Price', accessor: (p) => `${state.settings.currency} ${p.price.toFixed(2)}`, width: '9%', align: 'right' },
+    { key: 'cost', header: 'Cost', accessor: (p) => `${state.settings.currency} ${p.cost.toFixed(2)}`, width: '9%', align: 'right' },
     { key: 'stock', header: 'Stock', accessor: (p) => p.stock, width: '7%', align: 'right' },
     { key: 'minStock', header: 'Min', accessor: (p) => p.minStock, width: '6%', align: 'right' },
-    { key: 'value', header: 'Stock Value', accessor: (p) => `$ ${(p.stock * p.cost).toFixed(2)}`, width: '11%', align: 'right' },
+    { key: 'value', header: 'Stock Value', accessor: (p) => `${state.settings.currency} ${(p.stock * p.cost).toFixed(2)}`, width: '11%', align: 'right' },
     { key: 'barcode', header: 'Barcode', accessor: (p) => p.barcode || '-', width: '10%' },
     { key: 'created', header: 'Created', accessor: (p) => format(new Date(p.createdAt), 'yyyy-MM-dd'), width: '4%' },
   ];
@@ -231,7 +231,7 @@ export function InventoryManager() {
     { label: 'Products (Filtered)', value: String(filterStats.totalCount), highlight: true },
     { label: 'Low Stock', value: String(filterStats.low) },
     { label: 'Out of Stock', value: String(filterStats.out) },
-    { label: 'Inventory Value', value: `$ ${filterStats.invVal.toFixed(2)}` },
+    { label: 'Inventory Value', value: `${state.settings.currency} ${filterStats.invVal.toFixed(2)}` },
   ];
 
   const getDateFilterLabel = (): string => {
@@ -428,7 +428,7 @@ export function InventoryManager() {
           <div className="flex items-center justify-between relative z-10">
             <div>
               <p className="text-green-100 text-sm font-medium">Inventory Value</p>
-              <p className="text-xl lg:text-2xl font-bold">$ {totalValue.toFixed(2)}</p>
+              <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {totalValue.toFixed(2)}</p>
             </div>
             <div className="bg-white/20 p-3 rounded-2xl">
               <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
@@ -611,10 +611,10 @@ export function InventoryManager() {
                       <span className="badge badge-info">{product.category}</span>
                     </td>
                     <td className="table-cell font-semibold">
-                      $ {product.price.toFixed(2)}
+                      {state.settings.currency} {product.price.toFixed(2)}
                     </td>
                     <td className="table-cell text-gray-600">
-                      $ {product.cost.toFixed(2)}
+                      {state.settings.currency} {product.cost.toFixed(2)}
                     </td>
                     <td className="table-cell">
                       <div className="flex items-center space-x-2">

@@ -24,7 +24,7 @@ export function Settings() {
       storeLogo: state.settings.storeLogo,
       taxRate: state.settings.taxRate.toString(),
       currency: state.settings.currency,
-      baseCurrency: state.settings.baseCurrency || 'USD',
+      baseCurrency: state.settings.baseCurrency || 'LKR',
       receiptPrinter: state.settings.receiptPrinter,
       autoBackup: state.settings.autoBackup,
       theme: state.settings.theme || 'light',

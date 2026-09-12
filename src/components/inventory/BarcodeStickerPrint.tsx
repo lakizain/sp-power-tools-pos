@@ -573,7 +573,7 @@ export function BarcodeStickerPrint({
     product?.barcode || '';
 
   const currency =
-    state.settings.currency || 'Rs.';
+    state.settings.currency || 'LKR';
 
   /**
    * ============================================================

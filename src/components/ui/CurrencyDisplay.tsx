@@ -55,9 +55,9 @@ export function CurrencyDisplay({
             } catch (error) {
                 console.error('Error updating currency display:', error);
                 // Fallback to basic formatting
-                const fallbackCurrency = currency || 'USD';
-                const fallbackSymbol = fallbackCurrency === 'USD' ? '$' : fallbackCurrency;
-                setFormattedAmount(`${fallbackSymbol}${amount.toFixed(2)}`);
+                const fallbackCurrency = currency || 'LKR';
+                const fallbackSymbol = fallbackCurrency === 'USD' ? 'LKR' : fallbackCurrency;
+                setFormattedAmount(`${fallbackSymbol} ${amount.toFixed(2)}`);
             } finally {
                 setIsLoading(false);
             }
@@ -91,7 +91,7 @@ interface SimpleCurrencyDisplayProps {
     className?: string;
 }
 
-export function SimpleCurrencyDisplay({ amount, currency = 'USD', className = '' }: SimpleCurrencyDisplayProps) {
+export function SimpleCurrencyDisplay({ amount, currency = 'LKR', className = '' }: SimpleCurrencyDisplayProps) {
     const [formatted, setFormatted] = useState<string>('');
 
     useEffect(() => {
@@ -102,8 +102,8 @@ export function SimpleCurrencyDisplay({ amount, currency = 'USD', className = ''
                 setFormatted(formatted);
             } catch (error) {
                 // Fallback formatting
-                const symbol = currency === 'USD' ? '$' : currency;
-                setFormatted(`${symbol}${amount.toFixed(2)}`);
+                const symbol = currency === 'USD' ? 'LKR' : currency;
+                setFormatted(`${symbol} ${amount.toFixed(2)}`);
             }
         };
 
@@ -129,7 +129,7 @@ interface CurrencyInputProps {
 export function CurrencyInput({
     value,
     onChange,
-    currency = 'USD',
+    currency = 'LKR',
     placeholder = '0.00',
     className = '',
     disabled = false,

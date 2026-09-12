@@ -553,7 +553,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                             <span className="font-medium">Category:</span> {existingProductBySku.category || '-'}
                           </div>
                           <div>
-                            <span className="font-medium">Price:</span> Rs {existingProductBySku.price.toFixed(2)}
+                            <span className="font-medium">Price:</span> {state.settings.currency} {existingProductBySku.price.toFixed(2)}
                           </div>
                         </div>
                         {onOpenStockAdjustment && (
@@ -815,7 +815,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                   />
                   {formData.cost && parseFloat(formData.cost) > 250000 && (
                     <p className="text-xs text-amber-600 mt-1">
-                      ℹ️ Cost exceeds Rs 250,000 — please enter sale price manually
+                      ℹ️ Cost exceeds {state.settings.currency} 250,000 — please enter sale price manually
                     </p>
                   )}
                   {formData.cost && parseFloat(formData.cost) <= 250000 && parseFloat(formData.cost) > 0 && (
