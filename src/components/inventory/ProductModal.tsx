@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Scale, ScanLine, Wand2, Printer, FolderPlus, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { X, Scale, ScanLine, Wand2, Printer, FolderPlus, RefreshCw, SlidersHorizontal, Package } from 'lucide-react';
 import { Product, ProductBatch, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import Swal from 'sweetalert2';
@@ -15,9 +15,10 @@ interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product | null;
+  onOpenStockAdjustment?: (existingProduct: Product) => void;
 }
 
-export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
+export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }: ProductModalProps) {
   const { dispatch, state } = useApp();
   
   const [formData, setFormData] = useState({
@@ -51,6 +52,16 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   const lastScanKeyTimeRef = useRef<number>(0);
   const barcodePreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const stickerCountRef = useRef<number>(1);
+
+  const existingProductBySku = useMemo<Product | null>(() => {
+    if (product) return null;
+    const skuTrimmed = formData.sku.trim();
+    if (!skuTrimmed) return null;
+    const found = state.products.find(
+      (p: Product) => p.sku.trim().toLowerCase() === skuTrimmed.toLowerCase()
+    );
+    return found || null;
+  }, [formData.sku, state.products, product]);
 
   const loadCategories = async () => {
     try {
@@ -499,6 +510,70 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  SKU *
+                </label>
+                <input
+                  type="text"
+                  name="sku"
+                  value={formData.sku}
+                  onChange={handleChange}
+                  required
+                  className="input"
+                  placeholder="Enter SKU"
+                />
+                {existingProductBySku && (
+                  <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-amber-100 rounded-lg shrink-0">
+                        <Package className="h-5 w-5 text-amber-700" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-amber-800">
+                          ⚠️ Product with this SKU already exists
+                        </p>
+                        <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-amber-700">
+                          <div>
+                            <span className="font-medium">Name:</span> {existingProductBySku.name}
+                          </div>
+                          <div>
+                            <span className="font-medium">Current Stock:</span>{' '}
+                            <span className={`font-mono font-bold ${
+                              existingProductBySku.trackInventory === false
+                                ? 'text-gray-600'
+                                : existingProductBySku.stock === 0
+                                ? 'text-red-600'
+                                : existingProductBySku.stock <= (existingProductBySku.minStock || 0)
+                                ? 'text-orange-600'
+                                : 'text-emerald-700'
+                            }`}>
+                              {existingProductBySku.trackInventory === false ? 'N/A' : existingProductBySku.stock}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">Category:</span> {existingProductBySku.category || '-'}
+                          </div>
+                          <div>
+                            <span className="font-medium">Price:</span> Rs {existingProductBySku.price.toFixed(2)}
+                          </div>
+                        </div>
+                        {onOpenStockAdjustment && (
+                          <button
+                            type="button"
+                            onClick={() => onOpenStockAdjustment(existingProductBySku)}
+                            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm"
+                          >
+                            <SlidersHorizontal className="h-4 w-4" />
+                            Quick Stock Adjustment
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Product Name *
                 </label>
                 <input
@@ -585,21 +660,6 @@ export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
                     </p>
                   )}
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  SKU *
-                </label>
-                <input
-                  type="text"
-                  name="sku"
-                  value={formData.sku}
-                  onChange={handleChange}
-                  required
-                  className="input"
-                  placeholder="Enter SKU"
-                />
               </div>
 
               <div>

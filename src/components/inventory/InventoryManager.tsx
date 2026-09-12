@@ -336,6 +336,13 @@ export function InventoryManager() {
     setShowStockAdjustModal(true);
   };
 
+  const handleOpenStockAdjustment = (existingProduct: Product) => {
+    setShowProductModal(false);
+    setEditingProduct(null);
+    setStockAdjustProducts([existingProduct]);
+    setShowStockAdjustModal(true);
+  };
+
   const handleStockAdjustmentComplete = () => {
     setSelectedProductIds(new Set());
     window.location.reload();
@@ -666,6 +673,7 @@ export function InventoryManager() {
         isOpen={showProductModal}
         onClose={() => setShowProductModal(false)}
         product={editingProduct}
+        onOpenStockAdjustment={handleOpenStockAdjustment}
       />
 
       <BarcodeStickerPrint
