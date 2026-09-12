@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Printer, FolderPlus, CalendarRange, Download, SlidersHorizontal } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Printer, FolderPlus, CalendarRange, Download, SlidersHorizontal, Tag, ArrowUpDown } from 'lucide-react';
 import { Product, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { ProductModal } from './ProductModal';
@@ -450,41 +450,50 @@ export function InventoryManager() {
       </div>
 
       {/* Filters and Controls */}
-      <div className="card p-4 lg:p-6">
-        <div className="space-y-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1 max-w-xl">
+      <div className="bg-white p-4 md:p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="lg:col-span-2">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
                 type="text"
                 placeholder="Search products by name, SKU, or barcode..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="input pl-10"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+          </div>
 
+          <div className="relative">
+            <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="select min-w-[150px]"
+              className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
             >
               {categories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
+          </div>
 
+          <div className="relative">
+            <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <select
               value={stockFilter}
               onChange={(e) => setStockFilter(e.target.value as 'all' | 'in_stock' | 'low_stock' | 'out_of_stock')}
-              className="select min-w-[150px]"
+              className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
             >
               <option value="all">All Stock Status</option>
               <option value="in_stock">📦 In Stock</option>
               <option value="low_stock">⚠️ Low Stock</option>
               <option value="out_of_stock">🔴 Out of Stock</option>
             </select>
+          </div>
 
+          <div className="relative">
+            <ArrowUpDown className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <select
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
@@ -492,7 +501,7 @@ export function InventoryManager() {
                 setSortBy(field as 'name' | 'stock' | 'price');
                 setSortOrder(order as 'asc' | 'desc');
               }}
-              className="select min-w-[150px]"
+              className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
             >
               <option value="name-asc">Name A-Z</option>
               <option value="name-desc">Name Z-A</option>
@@ -503,47 +512,46 @@ export function InventoryManager() {
             </select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <CalendarRange className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <select
-                value={datePreset}
-                onChange={(e) => setDatePreset(e.target.value)}
-                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none text-sm"
-              >
-                <option value="all">📅 All Products (No Date Filter)</option>
-                <option value="today">🗓️ Created Today</option>
-                <option value="week">📆 Created This Week</option>
-                <option value="month">📊 Created This Month</option>
-                <option value="last_month">📅 Created Last Month</option>
-                <option value="last_3_months">📈 Last 3 Months</option>
-                <option value="year">🗃️ Created This Year</option>
-                <option value="custom">🎯 Custom Date Range...</option>
-              </select>
-            </div>
-            {datePreset === 'custom' && (
-              <>
-                <div>
-                  <input
-                    type="date"
-                    value={customFromDate}
-                    onChange={(e) => setCustomFromDate(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    placeholder="From (Created)"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="date"
-                    value={customToDate}
-                    onChange={(e) => setCustomToDate(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                    placeholder="To (Created)"
-                  />
-                </div>
-              </>
-            )}
+          <div className="relative">
+            <CalendarRange className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <select
+              value={datePreset}
+              onChange={(e) => setDatePreset(e.target.value)}
+              className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+            >
+              <option value="all">📅 All Products (No Date Filter)</option>
+              <option value="today">🗓️ Created Today</option>
+              <option value="week">📆 Created This Week</option>
+              <option value="month">📊 Created This Month</option>
+              <option value="last_month">📅 Created Last Month</option>
+              <option value="last_3_months">📈 Last 3 Months</option>
+              <option value="year">🗃️ Created This Year</option>
+              <option value="custom">🎯 Custom Date Range...</option>
+            </select>
           </div>
+
+          {datePreset === 'custom' && (
+            <>
+              <div>
+                <input
+                  type="date"
+                  value={customFromDate}
+                  onChange={(e) => setCustomFromDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="From (Created)"
+                />
+              </div>
+              <div>
+                <input
+                  type="date"
+                  value={customToDate}
+                  onChange={(e) => setCustomToDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="To (Created)"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
