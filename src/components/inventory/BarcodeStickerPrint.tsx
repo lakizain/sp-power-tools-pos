@@ -15,7 +15,9 @@ import { X, Printer, Minus, Plus } from 'lucide-react';
  * IMPORTANT:
  *
  * Thermal/Xprinter:
- *   Physical sticker = 38mm × 25mm
+ *   Physical sticker = 38mm × 25mm (or 50mm × 25mm)
+ *   Print page      = 80mm × 25mm (one sticker per page)
+ *   Sticker sits on the LEFT of the 80mm print path
  *
  * A4:
  *   Physical sticker = 40mm × 27mm
@@ -30,14 +32,15 @@ import { X, Printer, Minus, Plus } from 'lucide-react';
  * THERMAL / XPRINTER CONFIG
  * ============================================================
  *
- * Xprinter XP-365B
- * Physical sticker roll:
+ * Xprinter XP-T361U / 80mm thermal printers
+ * Physical sticker:
  *   Width  = 38mm
  *   Height = 25mm
  *
- * Thermal preview/print is rendered on an 80mm roll canvas,
- * while each physical label remains 38mm × 25mm and is
- * left-aligned on the media to match the printer example.
+ * The printer path is 80mm wide. The 38mm label is left-aligned
+ * on that path (roller on the left). Each copy is printed as a
+ * single 80mm × 25mm page so Chrome does not fall back to the
+ * driver's large "USER" / A4 sheet.
  */
 const THERMAL_CONFIG = {
   pageWidthMm: 80,
@@ -94,9 +97,9 @@ const THERMAL_CONFIG = {
 const THERMAL_ROLL_CONFIG = {
   mediaWidthMm: 80,
   stickerOffsetLeftMm: 0,
-  stickerOffsetTopMm: 4.5,
-  stickerGapMm: 7,
-  bottomPaddingMm: 4.5,
+  stickerOffsetTopMm: 0,
+  stickerGapMm: 0,
+  bottomPaddingMm: 0,
   previewMaxCopies: 3,
 } as const;
 
@@ -138,9 +141,9 @@ const THERMAL_50_CONFIG = {
 const THERMAL_50_ROLL_CONFIG = {
   mediaWidthMm: 80,
   stickerOffsetLeftMm: 15,
-  stickerOffsetTopMm: 4.5,
-  stickerGapMm: 7,
-  bottomPaddingMm: 4.5,
+  stickerOffsetTopMm: 0,
+  stickerGapMm: 0,
+  bottomPaddingMm: 0,
   previewMaxCopies: 3,
 } as const;
 
@@ -239,6 +242,48 @@ function getRollConfig(mode: PrintMode): RollConfig {
   return mode === 'thermal50'
     ? THERMAL_50_ROLL_CONFIG
     : THERMAL_ROLL_CONFIG;
+}
+
+/**
+ * Chrome ignores named @page rules and `size: 80mm auto`.
+ * Inject a single explicit @page size so the print dialog
+ * does not fall back to the Xprinter "USER" sheet.
+ */
+function getPrintPageStyle(mode: PrintMode): string {
+  if (mode === 'a4grid') {
+    return `
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      @media print {
+        html, body {
+          width: 210mm !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+      }
+    `;
+  }
+
+  const roll = getRollConfig(mode);
+  const sticker = getStickerConfig(mode);
+
+  return `
+    @page {
+      size: ${roll.mediaWidthMm}mm ${sticker.stickerHeightMm}mm;
+      margin: 0;
+    }
+    @media print {
+      html, body {
+        width: ${roll.mediaWidthMm}mm !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    }
+  `;
 }
 
 /**
@@ -743,16 +788,21 @@ export function BarcodeStickerPrint({
         mode
       );
 
-      /**
-       * Trigger browser print.
-       */
-      window.print();
+      const pageStyle =
+        document.createElement(
+          'style'
+        );
+      pageStyle.id =
+        'barcode-sticker-page-style';
+      pageStyle.textContent =
+        getPrintPageStyle(mode);
+      document.head.appendChild(
+        pageStyle
+      );
 
-      /**
-       * Clean up after printing.
-       */
-      setTimeout(() => {
+      const cleanupPrint = () => {
         clone.remove();
+        pageStyle.remove();
 
         bodyChildren.forEach(
           (child) => {
@@ -761,7 +811,22 @@ export function BarcodeStickerPrint({
             );
           }
         );
-      }, 500);
+
+        window.removeEventListener(
+          'afterprint',
+          cleanupPrint
+        );
+      };
+
+      window.addEventListener(
+        'afterprint',
+        cleanupPrint
+      );
+
+      /**
+       * Trigger browser print.
+       */
+      window.print();
     }, 150);
   };
 
@@ -841,64 +906,65 @@ export function BarcodeStickerPrint({
    * ============================================================
    */
   const renderThermalSheet = () => {
-    const rollHeightMm =
-      rollConfig.stickerOffsetTopMm +
-      copies *
-        stickerConfig.stickerHeightMm +
-      Math.max(0, copies - 1) *
-        rollConfig.stickerGapMm +
-      rollConfig.bottomPaddingMm;
-
     return (
-      <div
-        style={{
-          width: mm(
-            rollConfig.mediaWidthMm
-          ),
-          minHeight: mm(rollHeightMm),
-          position: 'relative',
-          overflow: 'hidden',
-          background: '#ffffff',
-          margin: 0,
-          padding: 0,
-          boxSizing: 'border-box',
-        }}
-      >
+      <>
         {Array.from({ length: copies }).map((_, i) => (
           <div
-            key={`thermal-${i}`}
+            key={`thermal-page-${i}`}
             style={{
               width: mm(
-                stickerConfig.stickerWidthMm
+                rollConfig.mediaWidthMm
               ),
               height: mm(
                 stickerConfig.stickerHeightMm
               ),
-              position: 'absolute',
-              left: mm(
-                rollConfig.stickerOffsetLeftMm
-              ),
-              top: mm(
-                rollConfig.stickerOffsetTopMm +
-                  i *
-                    (stickerConfig.stickerHeightMm +
-                      rollConfig.stickerGapMm)
-              ),
+              position: 'relative',
               overflow: 'hidden',
               background: '#ffffff',
               margin: 0,
               padding: 0,
               boxSizing: 'border-box',
+              pageBreakAfter:
+                i < copies - 1
+                  ? 'always'
+                  : 'auto',
+              breakAfter:
+                i < copies - 1
+                  ? 'page'
+                  : 'auto',
             }}
           >
-            <StickerContent
-              {...stickerContentProps}
-              stickerKey={`t-${i}`}
-              showBorder={true}
-            />
+            <div
+              style={{
+                width: mm(
+                  stickerConfig.stickerWidthMm
+                ),
+                height: mm(
+                  stickerConfig.stickerHeightMm
+                ),
+                position: 'absolute',
+                left: mm(
+                  rollConfig.stickerOffsetLeftMm
+                ),
+                top: mm(
+                  rollConfig.stickerOffsetTopMm
+                ),
+                overflow: 'hidden',
+                background: '#ffffff',
+                margin: 0,
+                padding: 0,
+                boxSizing: 'border-box',
+              }}
+            >
+              <StickerContent
+                {...stickerContentProps}
+                stickerKey={`t-${i}`}
+                showBorder={true}
+              />
+            </div>
           </div>
         ))}
-      </div>
+      </>
     );
   };
 
@@ -1474,7 +1540,7 @@ export function BarcodeStickerPrint({
 
                   {mode === 'a4grid'
                     ? `A4 (${A4_GRID_CONFIG.pageWidthMm}×${A4_GRID_CONFIG.pageHeightMm}mm) · Grid: ${A4_GRID_CONFIG.columns}×${A4_GRID_CONFIG.rows} = ${stickersPerPage} stickers/page · Column-major`
-                    : `Sticker: ${stickerConfig.stickerWidthMm}×${stickerConfig.stickerHeightMm}mm · ${rollConfig.stickerOffsetLeftMm > 0 ? 'Centered' : 'Left-aligned'} on ${rollConfig.mediaWidthMm}mm printer path`}
+                    : `Sticker: ${stickerConfig.stickerWidthMm}×${stickerConfig.stickerHeightMm}mm · ${rollConfig.stickerOffsetLeftMm > 0 ? 'Centered' : 'Left-aligned'} on ${rollConfig.mediaWidthMm}×${stickerConfig.stickerHeightMm}mm page · Chrome: Scale 100%, Margins None`}
 
                   {mode === 'a4grid' &&
                     copies > 0 && (
@@ -1557,38 +1623,7 @@ export function BarcodeStickerPrint({
             PRINT CSS
         ====================================================== */}
         <style>{`
-
-          /* ====================================================
-             GLOBAL PRINT PAGE DEFINITIONS
-          ==================================================== */
-
-          @page {
-            margin: 0;
-          }
-
-          /*
-           * Thermal page.
-           *
-           * 80mm roll width.
-           */
-          @page thermal {
-            size: 80mm auto;
-            margin: 0;
-          }
-
-          @page thermal50 {
-            size: 80mm auto;
-            margin: 0;
-          }
-
-          /*
-           * A4 page.
-           */
-          @page a4grid {
-            size: A4 portrait;
-            margin: 0;
-          }
-
+          ${getPrintPageStyle(mode)}
 
           /* ====================================================
              PRINT MEDIA
@@ -1600,9 +1635,6 @@ export function BarcodeStickerPrint({
             body {
               margin: 0 !important;
               padding: 0 !important;
-
-              width: auto !important;
-              height: auto !important;
 
               background: #ffffff !important;
 
@@ -1682,8 +1714,6 @@ export function BarcodeStickerPrint({
 
             #barcode-sticker-print-root[data-print-mode="thermal"],
             #barcode-sticker-print-root[data-print-mode="thermal50"] {
-              page: thermal !important;
-
               width: 80mm !important;
               height: auto !important;
 
@@ -1693,18 +1723,14 @@ export function BarcodeStickerPrint({
               box-sizing: border-box !important;
             }
 
-            #barcode-sticker-print-root[data-print-mode="thermal50"] {
-              page: thermal50 !important;
-            }
-
 
             /*
-             * Thermal roll wrapper.
+             * One thermal sticker page = 80mm × 25mm.
              */
             #barcode-sticker-print-root[data-print-mode="thermal"] > div,
             #barcode-sticker-print-root[data-print-mode="thermal50"] > div {
               width: 80mm !important;
-              height: auto !important;
+              height: 25mm !important;
 
               margin: 0 !important;
               padding: 0 !important;
@@ -1734,8 +1760,6 @@ export function BarcodeStickerPrint({
             ================================================== */
 
             #barcode-sticker-print-root[data-print-mode="a4grid"] {
-              page: a4grid !important;
-
               width: 210mm !important;
               height: auto !important;
 
@@ -2393,3 +2417,4 @@ function StickerContent({
     </div>
   );
 }
+
