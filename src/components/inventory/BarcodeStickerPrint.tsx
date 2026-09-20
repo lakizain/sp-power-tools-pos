@@ -40,7 +40,7 @@ import { X, Printer, Minus, Plus } from 'lucide-react';
  * left-aligned on the media to match the printer example.
  */
 const THERMAL_CONFIG = {
-  pageWidthMm: 80,
+  pageWidthMm: 38,
   pageHeightMm: 25,
 
   stickerWidthMm: 38,
