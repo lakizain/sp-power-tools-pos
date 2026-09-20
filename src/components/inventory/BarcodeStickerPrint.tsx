@@ -92,7 +92,7 @@ const THERMAL_CONFIG = {
 } as const;
 
 const THERMAL_ROLL_CONFIG = {
-  mediaWidthMm: 80,
+  mediaWidthMm: 38,
   stickerOffsetLeftMm: 0,
   stickerOffsetTopMm: 4.5,
   stickerGapMm: 7,
@@ -101,7 +101,7 @@ const THERMAL_ROLL_CONFIG = {
 } as const;
 
 const THERMAL_50_CONFIG = {
-  pageWidthMm: 80,
+  pageWidthMm: 38,
   pageHeightMm: 25,
 
   stickerWidthMm: 50,
@@ -138,7 +138,7 @@ const THERMAL_50_CONFIG = {
 const XPRINTER_38MM_OFFSET_CALIBRATION_MM = 3;
 
 const THERMAL_ROLL_CONFIG = {
-  mediaWidthMm: 80,
+  mediaWidthMm: 38,
   stickerOffsetLeftMm: XPRINTER_38MM_OFFSET_CALIBRATION_MM,
   stickerOffsetTopMm: 0,
   stickerGapMm: 0,
