@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Printer, FolderPlus, CalendarRange, Download, SlidersHorizontal, Tag, ArrowUpDown } from 'lucide-react';
-import { Product, ProductCategory } from '../../types';
+import { Product, ProductCategory, Supplier } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { ProductModal } from './ProductModal';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
@@ -23,6 +23,8 @@ export function InventoryManager() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [dbCategories, setDbCategories] = useState<ProductCategory[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [selectedSupplier, setSelectedSupplier] = useState('All');
   const [stockFilter, setStockFilter] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [datePreset, setDatePreset] = useState('all');
   const [customFromDate, setCustomFromDate] = useState('');
@@ -42,8 +44,19 @@ export function InventoryManager() {
     }
   };
 
+  const loadSuppliers = async () => {
+    try {
+      const { suppliersService } = await import('../../lib/services');
+      const sups = await suppliersService.getAll();
+      setSuppliers(sups);
+    } catch (error) {
+      console.error('Error loading suppliers:', error);
+    }
+  };
+
   useEffect(() => {
     loadDbCategories();
+    loadSuppliers();
   }, []);
 
   const activeDbCategoryNames = dbCategories.filter(c => c.active).map(c => c.name);
@@ -136,7 +149,10 @@ export function InventoryManager() {
           }
         }
 
-        return matchesSearch && matchesCategory && matchesStock && matchesDate;
+        const matchesSupplier = selectedSupplier === 'All' ||
+          (selectedSupplier === 'none' ? !product.supplierId : product.supplierId === selectedSupplier);
+
+        return matchesSearch && matchesCategory && matchesStock && matchesDate && matchesSupplier;
       });
     const sortedByRelevance = sortBySearchRelevance(
       filtered,
@@ -182,7 +198,8 @@ export function InventoryManager() {
         return aValue > bValue ? -1 : aValue < bValue ? 1 : 0;
       }
     });
-  }, [state.products, searchTerm, selectedCategory, sortBy, sortOrder, stockFilter, datePreset, customFromDate, customToDate]);
+  }, [state.products, searchTerm, selectedCategory, sortBy, sortOrder, stockFilter, datePreset, customFromDate, customToDate, selectedSupplier]);
+  
 
   const exportProducts = () => {
     const csvContent = [
@@ -262,6 +279,7 @@ export function InventoryManager() {
     { label: 'Date Created', value: getDateFilterLabel() },
     ...(selectedCategory !== 'All' ? [{ label: 'Category', value: selectedCategory }] : []),
     ...(stockFilter !== 'all' ? [{ label: 'Stock Status', value: stockFilterLabel }] : []),
+    ...(selectedSupplier !== 'All' ? [{ label: 'Supplier', value: selectedSupplier === 'none' ? 'No supplier' : (suppliers.find(s => s.id === selectedSupplier)?.name || selectedSupplier) }] : []),
     ...(searchTerm ? [{ label: 'Search', value: searchTerm }] : []),
   ];
 
@@ -478,6 +496,21 @@ export function InventoryManager() {
             >
               {categories.map(category => (
                 <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative">
+            <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <select
+              value={selectedSupplier}
+              onChange={(e) => setSelectedSupplier(e.target.value)}
+              className="w-full pl-9 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+            >
+              <option value="All">All Suppliers</option>
+              <option value="none">No Supplier</option>
+              {suppliers.filter(s => s.active !== false).map(supplier => (
+                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
               ))}
             </select>
           </div>
