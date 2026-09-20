@@ -52,10 +52,10 @@ const THERMAL_CONFIG = {
    * Physical sticker is 38mm wide.
    * Content area = 36mm.
    */
-  marginLeftMm: 1.0,
-  marginRightMm: 1.0,
+  marginLeftMm: 0.5,
+  marginRightMm: 0.5,
   marginTopMm: 0.5,
-  marginBottomMm: 1.0,
+  marginBottomMm: 0.5,
 
   companyNameHeightMm: 2.4,
 
@@ -107,10 +107,10 @@ const THERMAL_50_CONFIG = {
   stickerWidthMm: 50,
   stickerHeightMm: 25,
 
-  marginLeftMm: 1.0,
-  marginRightMm: 1.0,
+  marginLeftMm: 0.5,
+  marginRightMm: 0.5,
   marginTopMm: 0.5,
-  marginBottomMm: 1.0,
+  marginBottomMm: 0.5,
 
   companyNameHeightMm: 1.9,
 
@@ -154,10 +154,10 @@ const A4_STICKER_CONFIG = {
   stickerWidthMm: 40,
   stickerHeightMm: 27,
 
-  marginLeftMm: 1.0,
-  marginRightMm: 1.0,
-  marginTopMm: 0.8,
-  marginBottomMm: 0.8,
+  marginLeftMm: 0.5,
+  marginRightMm: 0.5,
+  marginTopMm: 0.5,
+  marginBottomMm: 0.5,
 
   companyNameHeightMm: 1.8,
 
