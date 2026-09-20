@@ -52,7 +52,7 @@ function code128Pattern(text: string): string {
 }
 
 /**
- * snapToDots = false -> barcode label එකේ පළල පුරා විහිදෙනවා (Image 2 වගේ)
+ * snapToDots = false -> barcode label එකේ පළල පුරා විහිදෙනවා
  * snapToDots = true  -> printer dots වලට integer කරනවා (පළල අඩුයි, ඒත් bars හරියටම සමානයි)
  */
 function barcodeSVG(
@@ -86,6 +86,7 @@ function barcodeSVG(
 const LABEL_W = 38;   // mm
 const LABEL_H = 25;   // mm
 const MARGIN = 1.5;   // mm
+const OFFSET_X = 1.5; // mm  content එක දකුණට ගන්න ප්‍රමාණය (වැඩි කළොත් තව දකුණට යනවා)
 const BAR_H = 8;      // mm  (barcode උස)
 const DPM = 8;        // dots per mm (203 dpi)
 const SNAP_TO_DOTS = false; // scan වෙන්නේ නැත්නම් true කරලා බලන්න
@@ -97,7 +98,7 @@ const STICKER_CSS = `
 .stk {
   width: ${LABEL_W}mm;
   height: ${(LABEL_H - 0.3).toFixed(2)}mm;
-  padding: ${MARGIN}mm;
+  padding: ${MARGIN}mm ${MARGIN}mm ${MARGIN}mm ${MARGIN + OFFSET_X}mm;
   box-sizing: border-box;
   overflow: hidden;
   background: #fff;
@@ -131,7 +132,7 @@ const STICKER_CSS = `
 `;
 
 function stickerHtml(name: string, barcode: string, price: number): string {
-  const innerW = LABEL_W - MARGIN * 2;
+  const innerW = LABEL_W - MARGIN * 2 - OFFSET_X;
   const svg = barcodeSVG(barcode, innerW, BAR_H, DPM, SNAP_TO_DOTS);
   // නමේ දිග අනුව font size එක
   const len = name.length;
