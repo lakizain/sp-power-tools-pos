@@ -135,15 +135,16 @@ const THERMAL_50_CONFIG = {
   barcodeNumberFontSizePt: 6.6,
 } as const;
 
-const THERMAL_50_ROLL_CONFIG = {
+const XPRINTER_38MM_OFFSET_CALIBRATION_MM = 3;
+
+const THERMAL_ROLL_CONFIG = {
   mediaWidthMm: 80,
-  stickerOffsetLeftMm: 15,
-  stickerOffsetTopMm: 4.5,
-  stickerGapMm: 7,
-  bottomPaddingMm: 4.5,
+  stickerOffsetLeftMm: XPRINTER_38MM_OFFSET_CALIBRATION_MM,
+  stickerOffsetTopMm: 0,
+  stickerGapMm: 0,
+  bottomPaddingMm: 0,
   previewMaxCopies: 3,
 } as const;
-
 /**
  * ============================================================
  * A4 STICKER CONFIG
