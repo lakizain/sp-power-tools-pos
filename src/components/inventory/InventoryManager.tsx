@@ -696,7 +696,7 @@ export function InventoryManager() {
           setShowStickerPrint(false);
           setStickerPrintProduct(null);
         }}
-        product={stickerPrintProduct as Product}
+        product={stickerPrintProduct}
       />
 
       <CategoryModal
