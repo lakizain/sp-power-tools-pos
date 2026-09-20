@@ -289,24 +289,24 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
               </label>
             </div>
           </div>
-        </form>
 
-        <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all"
-          >
-            <Save className="h-4 w-4" />
-            <span>{editingSupplier ? 'Update Supplier' : 'Save Supplier'}</span>
-          </button>
-        </div>
+          <div className="p-6 border-t border-gray-200 -mx-6 -mb-6 mt-6 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all"
+            >
+              <Save className="h-4 w-4" />
+              <span>{editingSupplier ? 'Update Supplier' : 'Save Supplier'}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
