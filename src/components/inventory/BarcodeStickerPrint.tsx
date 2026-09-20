@@ -34,10 +34,6 @@ import { X, Printer, Minus, Plus } from 'lucide-react';
  * Physical sticker roll:
  *   Width  = 38mm
  *   Height = 25mm
- *
- * Thermal preview/print is rendered on an 80mm roll canvas,
- * while each physical label remains 38mm × 25mm and is
- * left-aligned on the media to match the printer example.
  */
 const THERMAL_CONFIG = {
   pageWidthMm: 38,
@@ -50,7 +46,7 @@ const THERMAL_CONFIG = {
    * Safe content margins.
    *
    * Physical sticker is 38mm wide.
-   * Content area = 36mm.
+   * Content area = 37mm.
    */
   marginLeftMm: 0.5,
   marginRightMm: 0.5,
@@ -75,9 +71,7 @@ const THERMAL_CONFIG = {
   gapMm: 0.25,
 
   /**
-   * 35mm barcode inside 36mm content area.
-   *
-   * Do NOT use 37mm here because the content width is only 36mm.
+   * Barcode width inside the content area.
    */
   barcodeWidthMm: 34.8,
 
@@ -91,15 +85,33 @@ const THERMAL_CONFIG = {
   barcodeNumberFontSizePt: 7.2,
 } as const;
 
+/**
+ * Calibration offset for the Xprinter 38mm roll.
+ * Increase / decrease this value to shift the sticker
+ * content horizontally on the media.
+ */
+const XPRINTER_38MM_OFFSET_CALIBRATION_MM = 3;
+
+/**
+ * Roll config for the 38×25mm thermal mode.
+ * (Previously this constant was declared twice - that caused
+ * "Identifier 'THERMAL_ROLL_CONFIG' has already been declared".
+ * Only ONE declaration is kept now.)
+ */
 const THERMAL_ROLL_CONFIG = {
   mediaWidthMm: 38,
-  stickerOffsetLeftMm: 0,
-  stickerOffsetTopMm: 4.5,
-  stickerGapMm: 7,
-  bottomPaddingMm: 4.5,
+  stickerOffsetLeftMm: XPRINTER_38MM_OFFSET_CALIBRATION_MM,
+  stickerOffsetTopMm: 0,
+  stickerGapMm: 0,
+  bottomPaddingMm: 0,
   previewMaxCopies: 3,
 } as const;
 
+/**
+ * ============================================================
+ * THERMAL 50mm CONFIG
+ * ============================================================
+ */
 const THERMAL_50_CONFIG = {
   pageWidthMm: 38,
   pageHeightMm: 25,
@@ -135,16 +147,20 @@ const THERMAL_50_CONFIG = {
   barcodeNumberFontSizePt: 6.6,
 } as const;
 
-const XPRINTER_38MM_OFFSET_CALIBRATION_MM = 3;
-
-const THERMAL_ROLL_CONFIG = {
-  mediaWidthMm: 38,
-  stickerOffsetLeftMm: XPRINTER_38MM_OFFSET_CALIBRATION_MM,
+/**
+ * Roll config for the 50×25mm thermal mode.
+ * This was referenced in the code (getRollConfig / RollConfig)
+ * but was never declared - it is added here.
+ */
+const THERMAL_50_ROLL_CONFIG = {
+  mediaWidthMm: 50,
+  stickerOffsetLeftMm: 0,
   stickerOffsetTopMm: 0,
   stickerGapMm: 0,
   bottomPaddingMm: 0,
   previewMaxCopies: 3,
 } as const;
+
 /**
  * ============================================================
  * A4 STICKER CONFIG
