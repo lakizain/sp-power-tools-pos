@@ -451,9 +451,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
       }
       return next;
     });
-    if (!product && name === 'category' && value.trim()) {
-      setTimeout(() => handleGenerateBarcode(), 0);
-    }
+
   };
 
   const handleDebouncedCheckbox = (
@@ -654,9 +652,6 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                             setFormData(prev => ({ ...prev, category: '' }));
                           } else {
                             setFormData(prev => ({ ...prev, category: e.target.value }));
-                            if (!product && e.target.value) {
-                              setTimeout(() => handleGenerateBarcode(), 0);
-                            }
                           }
                         }}
                         className="select flex-1"
