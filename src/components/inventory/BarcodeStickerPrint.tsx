@@ -8,7 +8,7 @@ interface BarcodeStickerPrintProps {
   product: Product | null;
 }
 
-// Code 128 patterns from the reference implementation
+// ---------- Code 128 ----------
 const PATTERNS = [
   "212222","222122","222221","121223","121322","131222","122213","122312","132212","221213",
   "221312","231212","112232","122132","122231","113222","123122","123221","223211","221132",
@@ -26,37 +26,52 @@ const PATTERNS = [
 function code128Pattern(text: string): string {
   const codes: number[] = [];
   let start: number;
-  
-  if (/^\d{4,}$/.test(text) && text.length % 2 === 0) {
-    start = 105; // Start C
-    for (let i = 0; i < text.length; i += 2) {
+
+  if (/^\d{4,}$/.test(text)) {
+    // All digits -> Start C (2 digits per symbol = compact, wide bars)
+    start = 105;
+    const pairsLen = text.length - (text.length % 2);
+    for (let i = 0; i < pairsLen; i += 2) {
       codes.push(parseInt(text.substr(i, 2), 10));
+    }
+    // Odd length: switch to Code B for the last digit
+    if (text.length % 2 === 1) {
+      codes.push(100); // Code B
+      codes.push(text.charCodeAt(text.length - 1) - 32);
     }
   } else {
     start = 104; // Start B
-    for (const ch of text) {
-      codes.push(ch.charCodeAt(0) - 32);
-    }
+    for (const ch of text) codes.push(ch.charCodeAt(0) - 32);
   }
-  
+
   let sum = start;
   codes.forEach((c, i) => { sum += c * (i + 1); });
   const check = sum % 103;
-  const all = [start, ...codes, check, 106];
-  
-  return all.map(c => PATTERNS[c]).join("");
+
+  return [start, ...codes, check, 106].map(c => PATTERNS[c]).join("");
 }
 
-function barcodeSVG(text: string, maxWidthMm: number, heightMm: number, dotsPerMm: number): string {
+/**
+ * snapToDots = false -> barcode label එකේ පළල පුරා විහිදෙනවා (Image 2 වගේ)
+ * snapToDots = true  -> printer dots වලට integer කරනවා (පළල අඩුයි, ඒත් bars හරියටම සමානයි)
+ */
+function barcodeSVG(
+  text: string,
+  maxWidthMm: number,
+  heightMm: number,
+  dotsPerMm: number,
+  snapToDots = false
+): string {
   const pattern = code128Pattern(text);
   const quiet = 4;
-  let totalModules = 0;
+  let totalModules = quiet * 2;
   for (const d of pattern) totalModules += +d;
-  totalModules += quiet * 2;
 
-  const availDots = Math.floor(maxWidthMm * dotsPerMm);
-  const dots = Math.max(1, Math.floor(availDots / totalModules));
-  const widthMm = totalModules * (dots / dotsPerMm);
+  let widthMm = maxWidthMm;
+  if (snapToDots) {
+    const dots = Math.max(1, Math.floor((maxWidthMm * dotsPerMm) / totalModules));
+    widthMm = totalModules * (dots / dotsPerMm);
+  }
 
   let x = quiet, rects = "";
   for (let i = 0; i < pattern.length; i++) {
@@ -67,23 +82,78 @@ function barcodeSVG(text: string, maxWidthMm: number, heightMm: number, dotsPerM
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthMm.toFixed(3)}mm" height="${heightMm}mm" viewBox="0 0 ${totalModules} 1" preserveAspectRatio="none" fill="#000">${rects}</svg>`;
 }
 
+// ---------- Printer / label settings (XPrinter XP-T361U) ----------
+const LABEL_W = 38;   // mm
+const LABEL_H = 25;   // mm
+const MARGIN = 1.5;   // mm
+const BAR_H = 8;      // mm  (barcode උස)
+const DPM = 8;        // dots per mm (203 dpi)
+const SNAP_TO_DOTS = false; // scan වෙන්නේ නැත්නම් true කරලා බලන්න
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const STICKER_CSS = `
+.stk {
+  width: ${LABEL_W}mm;
+  height: ${(LABEL_H - 0.3).toFixed(2)}mm;
+  padding: ${MARGIN}mm;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.stk-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.stk-name {
+  width: 100%;
+  height: 6mm;
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: uppercase;
+  text-align: left;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+.stk-bar { width: 100%; height: ${BAR_H}mm; }
+.stk-bar svg { display: block; shape-rendering: crispEdges; }
+.stk-price { font-size: 10pt; font-weight: 700; line-height: 1; white-space: nowrap; }
+.stk-code  { font-size: 8pt; font-weight: 700; line-height: 1; letter-spacing: 0.14em; white-space: nowrap; }
+`;
+
+function stickerHtml(name: string, barcode: string, price: number): string {
+  const innerW = LABEL_W - MARGIN * 2;
+  const svg = barcodeSVG(barcode, innerW, BAR_H, DPM, SNAP_TO_DOTS);
+  // නමේ දිග අනුව font size එක
+  const len = name.length;
+  const nameFont = len <= 24 ? 8 : len <= 36 ? 7 : 6;
+
+  return `
+    <div class="stk"><div class="stk-inner">
+      <div class="stk-name" style="font-size:${nameFont}pt">${escapeHtml(name)}</div>
+      <div class="stk-bar">${svg}</div>
+      <div class="stk-price">LKR. ${price.toFixed(2)}</div>
+      <div class="stk-code">${escapeHtml(barcode)}</div>
+    </div></div>`;
+}
+
 export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
-  if (!product || !isOpen) return null;
-  
+  // Hooks always before any early return
   const [quantity, setQuantity] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
-  
-  // Printer settings for XPrinter XP-T361U
-  const LABEL_W = 38; // mm
-  const LABEL_H = 25; // mm
-  const MARGIN = 1.5; // mm
-  const OFFSET_X = 0; // mm
-  const OFFSET_Y = 0; // mm
-  const BAR_H = 14; // mm
-  const DPM = 8; // dots per mm (203 dpi)
-  const FONT_PT = 8;
 
-  const handlePrint = async () => {
+  if (!product || !isOpen) return null;
+
+  const handlePrint = () => {
     if (!product.barcode) {
       alert('Product does not have a barcode');
       return;
@@ -98,105 +168,24 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         return;
       }
 
-      const innerW = LABEL_W - MARGIN * 2;
-      const barcodeSvg = barcodeSVG(product.barcode, innerW, BAR_H, DPM);
+      const one = stickerHtml(product.name, product.barcode, product.price);
+      const labels = Array.from({ length: quantity }, () => one).join('');
 
-      let html = `
-        <!DOCTYPE html>
-        <html lang="si">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>Barcode Sticker - ${product.name}</title>
-          <style>
-            @page { size: ${LABEL_W}mm ${LABEL_H}mm; margin: 0; }
-            * { box-sizing: border-box; }
-            body {
-              margin: 0;
-              padding: 0;
-              background: #fff;
-              font-family: Arial, sans-serif;
-            }
-            .sheet {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, ${LABEL_W}mm);
-              gap: 0;
-              justify-content: center;
-            }
-            .label {
-              background: #fff;
-              color: #000;
-              width: ${LABEL_W}mm;
-              height: ${(LABEL_H - 0.3).toFixed(2)}mm;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              overflow: hidden;
-              position: relative;
-            }
-            .label .inner {
-              width: ${innerW}mm;
-              left: ${OFFSET_X}mm;
-              top: ${OFFSET_Y}mm;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              position: relative;
-            }
-            .label .name {
-              font-size: 7pt;
-              font-weight: bold;
-              text-align: center;
-              margin-bottom: 0.5mm;
-              word-wrap: break-word;
-              max-width: 100%;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-            .label .code {
-              letter-spacing: 0.06em;
-              font-size: ${FONT_PT}pt;
-              margin-top: 0.8mm;
-            }
-            .label .price {
-              font-size: 9pt;
-              font-weight: bold;
-              margin-top: 0.5mm;
-            }
-            .label svg {
-              display: block;
-              shape-rendering: crispEdges;
-            }
-            @media print {
-              body { margin: 0; padding: 0; }
-              .label { border: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="sheet">
-      `;
-
-      for (let i = 0; i < quantity; i++) {
-        html += `
-          <div class="label">
-            <div class="inner">
-              <div class="name">${product.name}</div>
-              ${barcodeSvg}
-              <div class="code">${product.barcode}</div>
-              <div class="price">Rs. ${product.price.toFixed(2)}</div>
-            </div>
-          </div>
-        `;
-      }
-
-      html += `
-          </div>
-        </body>
-        </html>
-      `;
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Barcode Sticker - ${escapeHtml(product.name)}</title>
+  <style>
+    @page { size: ${LABEL_W}mm ${LABEL_H}mm; margin: 0; }
+    html, body { margin: 0; padding: 0; background: #fff; }
+    ${STICKER_CSS}
+    .stk { break-after: page; page-break-after: always; }
+    .stk:last-child { break-after: auto; page-break-after: auto; }
+  </style>
+</head>
+<body>${labels}</body>
+</html>`;
 
       printWindow.document.write(html);
       printWindow.document.close();
@@ -214,13 +203,12 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
   };
 
   const handleQuantityChange = (delta: number) => {
-    const newQuantity = Math.max(1, Math.min(50, quantity + delta));
-    setQuantity(newQuantity);
+    setQuantity(q => Math.max(1, Math.min(50, q + delta)));
   };
 
-  // Generate preview SVG
-  const innerW = LABEL_W - MARGIN * 2;
-  const previewBarcodeSvg = product.barcode ? barcodeSVG(product.barcode, innerW, BAR_H, DPM) : '';
+  const previewHtml = product.barcode
+    ? stickerHtml(product.name, product.barcode, product.price)
+    : '';
 
   return (
     <div className="modal-overlay">
@@ -246,7 +234,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
               </div>
               <div>
                 <span className="text-gray-500">Price:</span>
-                <span className="ml-2 font-semibold">Rs. {product.price.toFixed(2)}</span>
+                <span className="ml-2 font-semibold">LKR. {product.price.toFixed(2)}</span>
               </div>
               <div className="col-span-2">
                 <span className="text-gray-500">Barcode:</span>
@@ -277,36 +265,25 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             </button>
           </div>
 
-          {/* Preview */}
+          {/* Preview (exact print layout, 3x) */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Preview ({quantity} sticker{quantity > 1 ? 's' : ''})</h4>
-            <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: Math.min(quantity, 8) }).map((_, index) => (
+            <h4 className="text-sm font-medium text-gray-700 mb-3">
+              Preview ({quantity} sticker{quantity > 1 ? 's' : ''})
+            </h4>
+            <style>{STICKER_CSS}</style>
+            <div className="flex justify-center">
+              <div
+                className="border border-gray-300 shadow-sm overflow-hidden"
+                style={{ width: `${LABEL_W * 3}mm`, height: `${(LABEL_H - 0.3) * 3}mm` }}
+              >
                 <div
-                  key={index}
-                  className="border border-gray-300 rounded p-2 flex flex-col items-center justify-center"
-                  style={{ aspectRatio: '38/25' }}
-                >
-                  <div 
-                    className="text-[6px] font-bold text-center truncate w-full mb-1"
-                    dangerouslySetInnerHTML={{ __html: product.name }}
-                  />
-                  <div 
-                    className="w-full h-auto"
-                    dangerouslySetInnerHTML={{ __html: previewBarcodeSvg }}
-                  />
-                  <div className="text-[7px] font-bold mt-1">Rs. {product.price.toFixed(2)}</div>
-                </div>
-              ))}
-              {quantity > 8 && (
-                <div className="flex items-center justify-center text-gray-400 text-xs">
-                  +{quantity - 8} more
-                </div>
-              )}
+                  style={{ transform: 'scale(3)', transformOrigin: 'top left', width: `${LABEL_W}mm` }}
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Sticker Size Info */}
           <div className="text-center text-sm text-gray-500">
             <p>Sticker size: 38mm width × 25mm height (XPrinter XP-T361U)</p>
             <p className="text-xs mt-1">Printer: XP-T361U, 203 DPI (8 dots/mm)</p>
@@ -314,11 +291,7 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         </div>
 
         <div className="modal-footer">
-          <button
-            onClick={onClose}
-            className="btn btn-secondary"
-            disabled={isPrinting}
-          >
+          <button onClick={onClose} className="btn btn-secondary" disabled={isPrinting}>
             Cancel
           </button>
           <button
