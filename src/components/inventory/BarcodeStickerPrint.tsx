@@ -54,7 +54,7 @@ const THERMAL_CONFIG = {
    */
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
-  marginTopMm: 1.0,
+  marginTopMm: 0.5,
   marginBottomMm: 1.0,
 
   companyNameHeightMm: 2.4,
@@ -109,7 +109,7 @@ const THERMAL_50_CONFIG = {
 
   marginLeftMm: 1.0,
   marginRightMm: 1.0,
-  marginTopMm: 1.0,
+  marginTopMm: 0.5,
   marginBottomMm: 1.0,
 
   companyNameHeightMm: 1.9,
