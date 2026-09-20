@@ -20,6 +20,8 @@ export interface Product {
   unit?: string; // kg, lb, piece, etc.
   batches?: ProductBatch[];
   trackInventory?: boolean; // Whether to track and manage inventory for this product
+  supplierId?: string; // ID of the supplier
+  supplierName?: string; // Name of the supplier (for display)
 }
 
 export interface ProductBatch {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { X, Scale, ScanLine, Wand2, Printer, FolderPlus, RefreshCw, SlidersHorizontal, Package } from 'lucide-react';
-import { Product, ProductBatch, ProductCategory } from '../../types';
+import { Product, ProductBatch, ProductCategory, Supplier } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import Swal from 'sweetalert2';
 import {
@@ -38,6 +38,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
     unit: 'kg',
     image: '',
     trackInventory: true,
+    supplierId: '',
   });
   
   const [batches, setBatches] = useState<ProductBatch[]>([]);
@@ -47,6 +48,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const barcodeInputRef = useRef<HTMLInputElement>(null);
   const scanBufferRef = useRef<string>('');
   const lastScanKeyTimeRef = useRef<number>(0);
@@ -86,9 +88,20 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
     }
   };
 
+  const loadSuppliers = async () => {
+    try {
+      const { suppliersService } = await import('../../lib/services');
+      const sups = await suppliersService.getAll();
+      setSuppliers(sups);
+    } catch (error) {
+      console.error('Error loading suppliers:', error);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadCategories();
+      loadSuppliers();
     }
   }, [isOpen]);
 
@@ -115,6 +128,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
         unit: product.unit || 'kg',
         image: product.image || '',
         trackInventory: product.trackInventory ?? true,
+        supplierId: product.supplierId || '',
       });
       setBatches(product.batches || []);
       setIsCustomCategory(!product.category || !mergedCategoryOptions.includes(product.category));
@@ -136,6 +150,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
         unit: 'kg',
         image: '',
         trackInventory: true,
+        supplierId: '',
       });
       setBatches([]);
       setIsCustomCategory(false);
@@ -333,6 +348,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
       ? normalizeCode128Value(formData.barcode)
       : undefined;
 
+    const selectedSupplier = suppliers.find(s => s.id === formData.supplierId);
     const productData: Product = {
       id: product?.id || Date.now().toString(),
       name: formData.name,
@@ -351,6 +367,8 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
       unit: formData.isWeightBased ? formData.unit : undefined,
       image: formData.image || undefined,
       trackInventory: formData.trackInventory,
+      supplierId: formData.supplierId || undefined,
+      supplierName: selectedSupplier?.name || undefined,
       batches,
       createdAt: product?.createdAt || new Date(),
       updatedAt: new Date(),
@@ -497,6 +515,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
       unit: 'kg',
       image: '',
       trackInventory: true,
+      supplierId: '',
     });
     setBatches([]);
     setIsCustomCategory(false);
@@ -708,6 +727,33 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                       ⚠️ This is a new custom category. It will be saved with the product but won't appear in category management until added explicitly.
                     </p>
                   )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Supplier
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    name="supplierId"
+                    value={formData.supplierId}
+                    onChange={handleChange}
+                    className="select flex-1"
+                  >
+                    <option value="">No supplier</option>
+                    {suppliers.filter(s => s.active !== false).map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={loadSuppliers}
+                    className="btn btn-secondary px-3"
+                    title="Refresh suppliers"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
 

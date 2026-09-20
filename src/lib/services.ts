@@ -59,6 +59,8 @@ export const productsService = {
       pricePerUnit: product.price_per_unit || undefined,
       unit: product.unit || undefined,
       trackInventory: product.track_inventory ?? true,
+      supplierId: product.supplier_id || undefined,
+      supplierName: product.supplier_name || undefined,
       batches: product.product_batches?.map((batch: any) => ({
         id: batch.id,
         batchNumber: batch.batch_number,
@@ -92,7 +94,9 @@ export const productsService = {
         is_weight_based: product.isWeightBased,
         price_per_unit: product.pricePerUnit,
         unit: product.unit,
-        track_inventory: product.trackInventory
+        track_inventory: product.trackInventory,
+        supplier_id: product.supplierId,
+        supplier_name: product.supplierName
       })
       .select()
       .single()
@@ -136,7 +140,9 @@ export const productsService = {
         is_weight_based: product.isWeightBased,
         price_per_unit: product.pricePerUnit,
         unit: product.unit,
-        track_inventory: product.trackInventory
+        track_inventory: product.trackInventory,
+        supplier_id: product.supplierId,
+        supplier_name: product.supplierName
       })
       .eq('id', id)
       .select()
@@ -250,6 +256,8 @@ export const productsService = {
       isWeightBased: data.is_weight_based ?? false,
       pricePerUnit: data.price_per_unit || undefined,
       unit: data.unit || undefined,
+      supplierId: data.supplier_id || undefined,
+      supplierName: data.supplier_name || undefined,
       batches: data.product_batches?.map((batch: any) => ({
         id: batch.id,
         batchNumber: batch.batch_number,
