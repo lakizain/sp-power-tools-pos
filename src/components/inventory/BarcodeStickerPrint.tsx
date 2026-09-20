@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Printer, Plus, Minus } from 'lucide-react';
+import { X, Printer, Plus, Minus, Loader2 } from 'lucide-react';
 import { Product } from '../../types';
 
 interface BarcodeStickerPrintProps {
@@ -91,6 +91,9 @@ const BAR_H = 8;      // mm  (barcode උස)
 const DPM = 8;        // dots per mm (203 dpi)
 const SNAP_TO_DOTS = false; // scan වෙන්නේ නැත්නම් true කරලා බලන්න
 
+const MAX_QTY = 500;                 // එක වතාවකට print කළ හැකි උපරිම sticker ගණන
+const QUICK_QTY = [1, 5, 10, 25];    // quick select chips
+
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -147,32 +150,53 @@ function stickerHtml(name: string, barcode: string, price: number): string {
     </div></div>`;
 }
 
+const clampQty = (n: number) => Math.max(1, Math.min(MAX_QTY, n));
+
 export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
   // Hooks always before any early return
-  const [quantity, setQuantity] = useState(1);
+  const [qtyText, setQtyText] = useState('1'); // type කරන අගය (string) - හිස් කරන්නත් පුළුවන්
   const [isPrinting, setIsPrinting] = useState(false);
 
   if (!product || !isOpen) return null;
 
+  const quantity = parseInt(qtyText, 10) || 0;
+  const validQty = quantity >= 1 && quantity <= MAX_QTY;
+
+  const handleQtyInput = (raw: string) => {
+    // ඉලක්කම් විතරයි, ඉස්සරහ බිංදු අයින් කරනවා
+    const digits = raw
+      .replace(/\D/g, '')
+      .replace(/^0+(?=\d)/, '')
+      .slice(0, String(MAX_QTY).length);
+    if (digits && parseInt(digits, 10) > MAX_QTY) {
+      setQtyText(String(MAX_QTY));
+    } else {
+      setQtyText(digits);
+    }
+  };
+
+  const handleQtyBlur = () => {
+    if (!quantity) setQtyText('1');
+  };
+
+  const handleQuantityChange = (delta: number) => {
+    setQtyText(String(clampQty(quantity + delta)));
+  };
+
+  // New tab / preview page එකක් නැතුව, සැඟවුණු iframe එකකින් කෙලින්ම print කරනවා
   const handlePrint = () => {
     if (!product.barcode) {
       alert('Product does not have a barcode');
       return;
     }
+    if (!validQty) return;
 
     setIsPrinting(true);
-    try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert('Please allow popups to print barcodes');
-        setIsPrinting(false);
-        return;
-      }
 
-      const one = stickerHtml(product.name, product.barcode, product.price);
-      const labels = Array.from({ length: quantity }, () => one).join('');
+    const one = stickerHtml(product.name, product.barcode, product.price);
+    const labels = Array.from({ length: quantity }, () => one).join('');
 
-      const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -188,28 +212,55 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
 <body>${labels}</body>
 </html>`;
 
-      printWindow.document.write(html);
-      printWindow.document.close();
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText =
+      'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;';
 
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
+    let removed = false;
+    const removeIframe = () => {
+      if (removed) return;
+      removed = true;
+      iframe.remove();
+    };
+
+    iframe.onload = () => {
+      const win = iframe.contentWindow;
+      if (!win) {
+        setIsPrinting(false);
+        removeIframe();
+        return;
+      }
+      win.onafterprint = () => setTimeout(removeIframe, 300);
+
+      // barcode SVG render වෙන්න පොඩි වෙලාවක් දීලා print කරනවා
+      setTimeout(() => {
+        try {
+          win.focus();
+          win.print();
+        } catch (error) {
+          console.error('Error printing barcodes:', error);
+        } finally {
           setIsPrinting(false);
-        }, 250);
-      };
-    } catch (error) {
-      console.error('Error printing barcodes:', error);
-      setIsPrinting(false);
-    }
-  };
+          // afterprint නොවැටුණොත් ආරක්ෂාවට විනාඩියකින් අයින් කරනවා
+          setTimeout(removeIframe, 60000);
+        }
+      }, 150);
+    };
 
-  const handleQuantityChange = (delta: number) => {
-    setQuantity(q => Math.max(1, Math.min(50, q + delta)));
+    iframe.srcdoc = html;
+    document.body.appendChild(iframe);
   };
 
   const previewHtml = product.barcode
     ? stickerHtml(product.name, product.barcode, product.price)
     : '';
+
+  const printLabel = isPrinting
+    ? 'Printing…'
+    : validQty
+      ? `Print ${quantity} Sticker${quantity === 1 ? '' : 's'}`
+      : 'Print Stickers';
 
   return (
     <div className="modal-overlay">
@@ -244,32 +295,69 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
             </div>
           </div>
 
-          {/* Quantity Selector */}
-          <div className="flex items-center justify-center space-x-4">
-            <button
-              onClick={() => handleQuantityChange(-1)}
-              disabled={quantity <= 1}
-              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Minus className="h-5 w-5" />
-            </button>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900">{quantity}</div>
-              <div className="text-sm text-gray-500">stickers</div>
+          {/* Quantity: type කරන්නත් පුළුවන්, +/- වලිනුත් පුළුවන් */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="inline-flex items-stretch overflow-hidden rounded-xl border border-gray-300 bg-white shadow-sm focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100 transition-all">
+              <button
+                type="button"
+                onClick={() => handleQuantityChange(-1)}
+                disabled={quantity <= 1}
+                aria-label="Decrease sticker count"
+                className="px-4 text-gray-600 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Minus className="h-5 w-5" />
+              </button>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={qtyText}
+                onChange={(e) => handleQtyInput(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onBlur={handleQtyBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handlePrint();
+                }}
+                aria-label="Number of stickers"
+                className="w-24 border-x border-gray-200 py-2 text-center text-3xl font-bold text-gray-900 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => handleQuantityChange(1)}
+                disabled={quantity >= MAX_QTY}
+                aria-label="Increase sticker count"
+                className="px-4 text-gray-600 hover:bg-gray-100 active:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
             </div>
-            <button
-              onClick={() => handleQuantityChange(1)}
-              disabled={quantity >= 50}
-              className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Plus className="h-5 w-5" />
-            </button>
+
+            <div className="text-sm text-gray-500">
+              stickers <span className="text-gray-400">(max {MAX_QTY})</span>
+            </div>
+
+            <div className="flex flex-wrap justify-center gap-2">
+              {QUICK_QTY.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setQtyText(String(n))}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    quantity === n
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-gray-300 bg-white text-gray-600 hover:border-blue-400 hover:text-blue-600'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Preview (exact print layout, 3x) */}
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <h4 className="text-sm font-medium text-gray-700 mb-3">
-              Preview ({quantity} sticker{quantity > 1 ? 's' : ''})
+              Preview ({validQty ? quantity : 0} sticker{quantity === 1 ? '' : 's'})
             </h4>
             <style>{STICKER_CSS}</style>
             <div className="flex justify-center">
@@ -292,16 +380,24 @@ export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeSticker
         </div>
 
         <div className="modal-footer">
-          <button onClick={onClose} className="btn btn-secondary" disabled={isPrinting}>
+          <button
+            onClick={onClose}
+            disabled={isPrinting}
+            className="rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:bg-gray-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
             Cancel
           </button>
           <button
             onClick={handlePrint}
-            disabled={isPrinting || !product.barcode}
-            className="btn btn-primary flex items-center space-x-2"
+            disabled={isPrinting || !product.barcode || !validQty}
+            className="group inline-flex items-center gap-2.5 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-600/25 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/30 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-300 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none disabled:active:scale-100"
           >
-            <Printer className="h-4 w-4" />
-            <span>{isPrinting ? 'Printing...' : 'Print Stickers'}</span>
+            {isPrinting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4 transition-transform group-hover:-translate-y-0.5" />
+            )}
+            <span>{printLabel}</span>
           </button>
         </div>
       </div>
