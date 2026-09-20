@@ -12,7 +12,8 @@ import {
   settingsService,
   usersService,
   salesTabsService,
-  rentalsService
+  rentalsService,
+  suppliersService
 } from '../lib/services';
 
 const defaultFeatureToggles: FeatureToggles = {
@@ -377,6 +378,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_DISCOUNTS', payload: [] });
       dispatch({ type: 'SET_SALES_TABS', payload: [] });
       dispatch({ type: 'SET_RENTALS', payload: [] });
+      dispatch({ type: 'SET_SUPPLIERS', payload: [] });
       dispatch({ type: 'CLEAR_CART' });
       dispatch({ type: 'SET_CURRENT_USER', payload: null });
       setInitialized(false);
@@ -402,7 +404,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         settings,
         users,
         salesTabs,
-        rentals
+        rentals,
+        suppliers
       ] = await Promise.all([
         productsService.getAll(),
         customersService.getAll(),
@@ -411,7 +414,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         settingsService.get(),
         usersService.getAll(),
         user ? salesTabsService.getByUserId(user.id) : Promise.resolve([]),
-        rentalsService.getAll().catch((e) => { console.warn('Rentals not loaded yet (migration pending):', e.message); return []; })
+        rentalsService.getAll().catch((e) => { console.warn('Rentals not loaded yet (migration pending):', e.message); return []; }),
+        suppliersService.getAll().catch((e) => { console.warn('Suppliers not loaded yet:', e.message); return []; })
       ]);
 
       dispatch({ type: 'SET_PRODUCTS', payload: products });
@@ -422,6 +426,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_USERS', payload: users });
       dispatch({ type: 'SET_SALES_TABS', payload: salesTabs });
       dispatch({ type: 'SET_RENTALS', payload: rentals });
+      dispatch({ type: 'SET_SUPPLIERS', payload: suppliers });
 
       // Create initial sales tab if none exist
       if (salesTabs.length === 0 && user) {

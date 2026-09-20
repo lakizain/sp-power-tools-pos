@@ -10,6 +10,7 @@ import { swalConfig } from '../../lib/sweetAlert';
 import { matchesAnyField } from '../../lib/searchUtils';
 import { SupplierModal } from './SupplierModal';
 import { format } from 'date-fns';
+import { suppliersService } from '../../lib/services';
 
 export function SupplierManager() {
   const { state, dispatch } = useApp();
@@ -86,21 +87,38 @@ export function SupplierManager() {
       'Delete'
     );
     if (result.isConfirmed) {
-      dispatch({ type: 'DELETE_SUPPLIER', payload: supplier.id });
-      swalConfig.success('Supplier deleted successfully.');
+      try {
+        await suppliersService.delete(supplier.id);
+        dispatch({ type: 'DELETE_SUPPLIER', payload: supplier.id });
+        swalConfig.success('Supplier deleted successfully.');
+      } catch (error) {
+        console.error('Error deleting supplier:', error);
+        swalConfig.error('Failed to delete supplier. Please try again.');
+      }
     }
   };
 
-  const handleSave = (supplier: Supplier) => {
-    if (editingSupplier) {
-      dispatch({ type: 'UPDATE_SUPPLIER', payload: supplier });
-      swalConfig.success('Supplier updated successfully.');
-    } else {
-      dispatch({ type: 'ADD_SUPPLIER', payload: supplier });
-      swalConfig.success('Supplier added successfully.');
+  const handleSave = async (supplier: Supplier) => {
+    try {
+      if (editingSupplier) {
+        // Update existing supplier
+        const { id, createdAt, updatedAt, ...updateData } = supplier;
+        await suppliersService.update(editingSupplier.id, updateData);
+        dispatch({ type: 'UPDATE_SUPPLIER', payload: { ...supplier, id: editingSupplier.id } });
+        swalConfig.success('Supplier updated successfully.');
+      } else {
+        // Create new supplier - remove empty ID before passing to service
+        const { id, createdAt, updatedAt, ...createData } = supplier;
+        const savedSupplier = await suppliersService.create(createData);
+        dispatch({ type: 'ADD_SUPPLIER', payload: savedSupplier });
+        swalConfig.success('Supplier added successfully.');
+      }
+      setIsModalOpen(false);
+      setEditingSupplier(null);
+    } catch (error) {
+      console.error('Error saving supplier:', error);
+      swalConfig.error('Failed to save supplier. Please try again.');
     }
-    setIsModalOpen(false);
-    setEditingSupplier(null);
   };
 
   const exportSuppliers = () => {

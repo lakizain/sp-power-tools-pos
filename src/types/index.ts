@@ -74,6 +74,7 @@ export interface Supplier {
   paymentTerms: string;
   rating: number;
   createdAt: Date;
+  updatedAt: Date;
   contactPerson?: string;
   phone2?: string;
   website?: string;
@@ -82,7 +83,6 @@ export interface Supplier {
   notes?: string;
   totalPurchases?: number;
   outstandingBalance?: number;
-  updatedAt?: Date;
   active?: boolean;
 }
 
