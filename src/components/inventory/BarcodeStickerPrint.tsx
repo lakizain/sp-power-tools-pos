@@ -6,10 +6,11 @@ import { renderBarcodeToCanvas } from '../../lib/barcodeUtils';
 interface BarcodeStickerPrintProps {
   isOpen: boolean;
   onClose: () => void;
-  product: Product;
+  product: Product | null;
 }
 
 export function BarcodeStickerPrint({ isOpen, onClose, product }: BarcodeStickerPrintProps) {
+  if (!product || !isOpen) return null;
   const [quantity, setQuantity] = useState(1);
   const [isPrinting, setIsPrinting] = useState(false);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
