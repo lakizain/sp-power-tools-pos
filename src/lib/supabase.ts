@@ -5,15 +5,31 @@ const supabaseUrl: string | undefined = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey: string | undefined = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabaseServiceRoleKey: string | undefined = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 
-export const isSupabaseConfigured: boolean = !!(supabaseUrl && supabaseAnonKey)
+function hasPlaceholderSupabaseValue(value: string | undefined): boolean {
+  if (!value) return true
+  const normalized = value.trim()
+  return normalized === 'https://your-project.supabase.co' ||
+    normalized === 'your_supabase_anon_key' ||
+    normalized === 'your-service-role-key' ||
+    normalized === 'your-project.supabase.co' ||
+    normalized === 'your_supabase_url' ||
+    normalized === 'your_supabase_anon_key'
+}
+
+export const isSupabaseConfigured: boolean = !!(supabaseUrl && supabaseAnonKey) &&
+  !hasPlaceholderSupabaseValue(supabaseUrl) && !hasPlaceholderSupabaseValue(supabaseAnonKey)
 
 export function getMissingSupabaseEnvMessage(): string | null {
   const missing: string[] = []
-  if (!supabaseUrl) missing.push('VITE_SUPABASE_URL')
-  if (!supabaseAnonKey) missing.push('VITE_SUPABASE_ANON_KEY')
+  if (!supabaseUrl || hasPlaceholderSupabaseValue(supabaseUrl)) missing.push('VITE_SUPABASE_URL')
+  if (!supabaseAnonKey || hasPlaceholderSupabaseValue(supabaseAnonKey)) missing.push('VITE_SUPABASE_ANON_KEY')
   if (missing.length === 0) return null
-  return `Missing environment variables: ${missing.join(', ')}. ` +
-    `Please add them in Vercel → Project Settings → Environment Variables, then Redeploy.`
+  return `Missing or placeholder environment variables: ${missing.join(', ')}. ` +
+    `Replace the sample values in .env.local with your real Supabase project credentials:\n` +
+    `VITE_SUPABASE_URL=https://your-project.supabase.co\n` +
+    `VITE_SUPABASE_ANON_KEY=your_supabase_anon_key\n\n` +
+    `Find the real values in Supabase Dashboard → Project Settings → API. ` +
+    `For Vercel deployment, add the same keys in Project Settings → Environment Variables.`
 }
 
 let supabaseInstance: SupabaseClient<Database> | null = null

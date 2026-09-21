@@ -35,17 +35,17 @@ function MissingEnvScreen() {
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Setup Required</h1>
             <p className="text-gray-600 mb-5">
-              Supabase environment variables are not configured. Please follow these steps:
+              Supabase environment variables are not configured or still contain the sample values. Replace them with your real Supabase credentials before logging in.
             </p>
 
             <div className="space-y-4">
               <div className="rounded-2xl bg-red-50/80 border border-red-200/60 p-5">
                 <div className="flex items-center space-x-2 mb-2">
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold">1</span>
-                  <h3 className="font-semibold text-gray-900">Open Vercel Dashboard</h3>
+                  <h3 className="font-semibold text-gray-900">Create .env.local</h3>
                 </div>
                 <p className="text-sm text-gray-600 ml-8">
-                  Go to <span className="font-mono bg-white px-2 py-0.5 rounded border">https://vercel.com</span> → Your project
+                  In the project root, create a file named <span className="font-mono bg-white px-2 py-0.5 rounded border">.env.local</span>
                 </p>
               </div>
 
@@ -54,11 +54,11 @@ function MissingEnvScreen() {
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white text-xs font-bold">2</span>
                   <h3 className="font-semibold text-gray-900 flex items-center space-x-2">
                     <SettingsIcon className="h-4 w-4" />
-                    <span>Navigate to Settings → Environment Variables</span>
+                    <span>Add your Supabase credentials</span>
                   </h3>
                 </div>
                 <p className="text-sm text-gray-600 ml-8">
-                  Add these variables (tick all 3 environments: Production, Preview, Development)
+                  Copy the values from Supabase Dashboard → <span className="font-semibold">Project Settings → API</span>
                 </p>
                 <div className="mt-3 ml-8 space-y-2">
                   <div className="bg-white rounded-xl p-3 border border-orange-100 font-mono text-xs">
@@ -73,23 +73,20 @@ function MissingEnvScreen() {
                       <div><span className="font-bold text-orange-700">Value:</span> (your anon public key)</div>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    👉 Find these in Supabase Dashboard → <span className="font-semibold">Project Settings → API</span>
-                  </p>
                 </div>
               </div>
 
               <div className="rounded-2xl bg-emerald-50/80 border border-emerald-200/60 p-5">
                 <div className="flex items-center space-x-2 mb-2">
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 text-white text-xs font-bold">3</span>
-                  <h3 className="font-semibold text-gray-900">Redeploy</h3>
+                  <h3 className="font-semibold text-gray-900">Restart the app</h3>
                 </div>
                 <p className="text-sm text-gray-600 ml-8">
-                  After saving, go to <span className="font-semibold">Deployments</span> → click the 3 dots next to your latest deployment → <span className="font-semibold">Redeploy</span>
+                  Save the file and restart Vite with <span className="font-mono bg-white px-2 py-0.5 rounded border">npm run dev</span>.
                 </p>
                 <div className="mt-3 ml-8 flex items-center space-x-2 text-xs text-emerald-700">
                   <ArrowRight className="h-3 w-3" />
-                  <span>Do NOT just refresh the page — new env vars only take effect after a fresh build/redeploy.</span>
+                  <span>If deploying to Vercel, add the same keys there under Project Settings → Environment Variables.</span>
                 </div>
               </div>
             </div>
