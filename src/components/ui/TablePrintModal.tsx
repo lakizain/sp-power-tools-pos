@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
 import { X, Printer, FileText, Calendar } from 'lucide-react';
 import { useApp } from '../../context/SupabaseAppContext';
-import { format } from 'date-fns';
 
 export interface PrintColumn<T = any> {
   key: string;
   header: string;
   accessor: (row: T) => React.ReactNode;
+  /** Ignored: column widths are now calculated automatically from the content. */
   width?: string;
   align?: 'left' | 'right' | 'center';
 }
@@ -31,6 +31,12 @@ interface TablePrintModalProps<T = any> {
   data: T[];
   summaries?: PrintSummary[];
   filters?: PrintFilterInfo[];
+  /**
+   * Columns to leave out of the print / PDF (the on-screen table is not affected).
+   * Matched against each column's `key` or `header`, ignoring case, spaces and symbols.
+   * e.g. ['category', 'barcode', 'createdAt']
+   */
+  hiddenColumns?: string[];
   reportDateField?: string;
   orientation?: 'portrait' | 'landscape';
   emptyMessage?: string;
@@ -40,95 +46,122 @@ function mm(n: number): string {
   return `${n.toFixed(3)}mm`;
 }
 
-const A4_CONFIG = {
-  pageWidthMm: 297,
-  pageHeightMm: 210,
-  portraitWidthMm: 210,
-  portraitHeightMm: 297,
-  marginXMm: 10,
-  marginYMm: 10,
-  firstPageHeaderMm: 24,
-  tableHeaderHeightMm: 5,
-  tableRowHeightMm: 3.85,
-  summaryFooterMm: 6,
+const PX_PER_MM = 3.7795;
+const FONT_FAMILY = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
+
+// ---- Layout constants (all in mm) -------------------------------------------------
+const LAYOUT = {
+  marginX: 10,
+  marginY: 10,
+  footerReserve: 6, // space kept free at the bottom for "Page x / y"
+  compactHeaderH: 10, // header used on page 2, 3, ...
+  tableHeaderH: 4.8,
+  rowH: 4.0,
+  summaryRowH: 4.8,
 };
 
-const PRINT_FONT = 'Arial, Helvetica, sans-serif';
-const CELL_BORDER = '0.15mm solid #000000';
-const HEADER_RULE = '0.55mm solid #000000';
-const ROW_STRIPE = '#f2f2f2';
+// ---- Visual constants (matches the "Daily Sales Report" sample) -------------------
+const COLORS = {
+  text: '#222222',
+  title: '#333333',
+  muted: '#6b6b6b',
+  meta: '#444444',
+  rule: '#2b2b2b',
+  grid: '#d9d9d9',
+};
+const CELL_BORDER = `0.3mm solid ${COLORS.grid}`;
 
 export function TablePrintModal<T>({
   isOpen,
   onClose,
   title,
   subtitle,
-  columns,
+  columns: allColumns,
   data,
   summaries,
   filters,
+  hiddenColumns,
   orientation = 'landscape',
   emptyMessage = 'No data to display',
 }: TablePrintModalProps<T>) {
   const { state } = useApp();
 
   const isLandscape = orientation === 'landscape';
-  const pageW = isLandscape ? A4_CONFIG.pageWidthMm : A4_CONFIG.portraitWidthMm;
-  const pageH = isLandscape ? A4_CONFIG.pageHeightMm : A4_CONFIG.portraitHeightMm;
-  const contentW = pageW - A4_CONFIG.marginXMm * 2;
+  const pageW = isLandscape ? 297 : 210;
+  const pageH = isLandscape ? 210 : 297;
 
-  const rowsPerPageFirst = useMemo(() => {
-    const used =
-      A4_CONFIG.marginYMm * 2 +
-      A4_CONFIG.firstPageHeaderMm +
-      (filters && filters.length > 0 ? 3 : 0) +
-      A4_CONFIG.tableHeaderHeightMm +
-      1;
-    const remaining = pageH - used;
-    return Math.max(8, Math.floor(remaining / A4_CONFIG.tableRowHeightMm));
-  }, [pageH, filters]);
+  const storeName = (state.settings.storeName || 'Business Report').toUpperCase();
+  const currency = state.settings.currency || 'LKR';
 
-  const rowsPerPageRest = useMemo(() => {
-    const used =
-      A4_CONFIG.marginYMm * 2 +
-      A4_CONFIG.tableHeaderHeightMm +
-      1;
-    const remaining = pageH - used;
-    return Math.max(12, Math.floor(remaining / A4_CONFIG.tableRowHeightMm));
-  }, [pageH]);
+  // e.g. "9/21/2026, 10:51:32 AM"
+  const generatedAt = useMemo(() => new Date().toLocaleString('en-US'), [isOpen]);
 
-  const pageSlices = useMemo(() => {
-    if (data.length === 0) {
-      return [{ start: 0, end: 0, isFirst: true, isLast: true }];
+  const hasFilters = !!filters && filters.length > 0;
+  const hasSummaries = !!summaries && summaries.length > 0;
+
+  // ---- Columns that should not appear in the printed report -------------------------
+  const columns = useMemo(() => {
+    if (!hiddenColumns || hiddenColumns.length === 0) return allColumns;
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const hidden = new Set(hiddenColumns.map(norm));
+    return allColumns.filter((c) => !hidden.has(norm(c.key)) && !hidden.has(norm(c.header)));
+  }, [allColumns, hiddenColumns]);
+
+  // ---- Column widths: based on the longest content in each column ------------------
+  const colWidths = useMemo(() => {
+    const weights = columns.map((col) => {
+      let max = col.header.length * 1.15;
+      for (const row of data) {
+        const v = col.accessor(row);
+        if (typeof v === 'string' || typeof v === 'number') {
+          max = Math.max(max, String(v).length);
+        } else if (v !== null && v !== undefined && v !== false) {
+          max = Math.max(max, 12);
+        }
+      }
+      return Math.min(Math.max(max, 4), 48) + 3; // +3 ≈ cell padding
+    });
+    const total = weights.reduce((a, b) => a + b, 0) || 1;
+    return weights.map((w) => (w / total) * 100);
+  }, [columns, data]);
+
+  // ---- Pagination -------------------------------------------------------------------
+  const firstHeaderH =
+    6.9 + // store name
+    5.5 + // report title
+    (subtitle ? 3.6 : 0) +
+    (hasFilters ? 4.4 : 0) +
+    3.6 + // generated on
+    3.4 + // padding + thick rule
+    3 + // gap below the header
+    2; // safety
+
+  const pages = useMemo(() => {
+    const avail = pageH - LAYOUT.marginY * 2 - LAYOUT.footerReserve - LAYOUT.tableHeaderH;
+    const cap1 = Math.max(3, Math.floor((avail - firstHeaderH) / LAYOUT.rowH));
+    const capN = Math.max(3, Math.floor((avail - LAYOUT.compactHeaderH) / LAYOUT.rowH));
+
+    const out: T[][] = [data.slice(0, cap1)];
+    let i = cap1;
+    while (i < data.length) {
+      out.push(data.slice(i, i + capN));
+      i += capN;
     }
-    const slices: { start: number; end: number; isFirst: boolean; isLast: boolean }[] = [];
-    let idx = 0;
-    let first = true;
-    while (idx < data.length) {
-      const limit = first ? rowsPerPageFirst : rowsPerPageRest;
-      const end = Math.min(idx + limit, data.length);
-      slices.push({ start: idx, end, isFirst: first, isLast: false });
-      idx = end;
-      first = false;
+
+    // Make sure the summary rows fit under the last page's table
+    if (hasSummaries) {
+      const last = out.length - 1;
+      const cap = last === 0 ? cap1 : capN;
+      const freeH = (cap - out[last].length) * LAYOUT.rowH;
+      const summaryH = summaries!.length * LAYOUT.summaryRowH + 3;
+      if (freeH < summaryH) out.push([]);
     }
-    if (slices.length > 0) {
-      slices[slices.length - 1].isLast = true;
-    }
-    return slices;
-  }, [data.length, rowsPerPageFirst, rowsPerPageRest]);
+    return out;
+  }, [data, pageH, firstHeaderH, hasSummaries, summaries]);
 
-  const totalPages = pageSlices.length;
+  const totalPages = pages.length;
 
-  const storeName = state.settings.storeName || 'Business Report';
-  const generatedAt = format(new Date(), 'M/d/yyyy, h:mm:ss a');
-
-  const reportDateLabel = useMemo(() => {
-    const dateFilter = filters?.find((f) => /date/i.test(f.label));
-    if (dateFilter?.value) return dateFilter.value;
-    if (subtitle) return subtitle;
-    return format(new Date(), 'd MMMM yyyy');
-  }, [filters, subtitle]);
-
+  // ---- Print ------------------------------------------------------------------------
   const handlePrint = () => {
     setTimeout(() => {
       const sheetEl = document.getElementById('table-print-sheet');
@@ -172,256 +205,302 @@ export function TablePrintModal<T>({
 
   if (!isOpen) return null;
 
-  const renderReportHeader = (showFull: boolean) => {
-    if (!showFull) return null;
-    return (
+  // ---- Page pieces ------------------------------------------------------------------
+  const renderFirstHeader = () => (
+    <div
+      style={{
+        textAlign: 'center',
+        paddingBottom: mm(2.5),
+        borderBottom: `0.9mm solid ${COLORS.rule}`,
+        marginBottom: mm(3),
+      }}
+    >
       <div
         style={{
-          textAlign: 'center',
-          fontFamily: PRINT_FONT,
-          color: '#000000',
-          marginBottom: mm(2),
+          fontSize: '15pt',
+          fontWeight: 800,
+          color: COLORS.title,
+          lineHeight: 1.15,
+          marginBottom: mm(0.8),
         }}
       >
-        <div
-          style={{
-            fontSize: '17pt',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            lineHeight: 1.15,
-            letterSpacing: '0.02em',
-          }}
-        >
-          {storeName}
-        </div>
-        <div
-          style={{
-            fontSize: '13pt',
-            fontWeight: 700,
-            marginTop: mm(1.2),
-            lineHeight: 1.2,
-          }}
-        >
-          {title}
-        </div>
-        <div style={{ fontSize: '10pt', marginTop: mm(1), lineHeight: 1.25 }}>
-          Date: {reportDateLabel}
-        </div>
-        <div style={{ fontSize: '8pt', marginTop: mm(0.6), lineHeight: 1.25 }}>
-          Generated on: {generatedAt}
-        </div>
-        {filters && filters.length > 0 && (
-          <div
-            style={{
-              fontSize: '8pt',
-              marginTop: mm(1.2),
-              lineHeight: 1.35,
-              color: '#000000',
-            }}
-          >
-            {filters
-              .filter((f) => !/date/i.test(f.label))
-              .map((f, i) => (
-                <div key={i}>
-                  {f.label}: {f.value}
-                </div>
-              ))}
-          </div>
-        )}
+        {storeName}
       </div>
+      <div
+        style={{
+          fontSize: '11.5pt',
+          fontWeight: 400,
+          color: COLORS.muted,
+          lineHeight: 1.2,
+          marginBottom: mm(0.6),
+        }}
+      >
+        {title}
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: '8pt', color: COLORS.muted, lineHeight: 1.3 }}>{subtitle}</div>
+      )}
+      {hasFilters && (
+        <div
+          style={{
+            fontSize: '9pt',
+            color: COLORS.text,
+            lineHeight: 1.3,
+            marginBottom: mm(0.6),
+          }}
+        >
+          {filters!.map((f, i) => (
+            <span key={i}>
+              {i > 0 && <span style={{ margin: `0 ${mm(1.6)}`, color: '#9ca3af' }}>|</span>}
+              {f.label}: {f.value}
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={{ fontSize: '8pt', color: COLORS.meta, lineHeight: 1.3 }}>
+        Generated on: {generatedAt}
+      </div>
+    </div>
+  );
+
+  const renderCompactHeader = (pageIndex: number) => (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        paddingBottom: mm(1.2),
+        borderBottom: `0.5mm solid ${COLORS.rule}`,
+        marginBottom: mm(2),
+        height: mm(LAYOUT.compactHeaderH - 3.2),
+        boxSizing: 'content-box',
+      }}
+    >
+      <div style={{ fontSize: '9pt', fontWeight: 800, color: COLORS.title }}>
+        {storeName}
+        <span style={{ fontWeight: 400, color: COLORS.muted, marginLeft: mm(2) }}>{title}</span>
+      </div>
+      <div style={{ fontSize: '7pt', color: COLORS.meta }}>
+        Page {pageIndex + 1} / {totalPages}
+      </div>
+    </div>
+  );
+
+  const renderTable = (pageData: T[], pageIndex: number) => (
+    <table
+      style={{
+        width: '100%',
+        borderCollapse: 'collapse',
+        tableLayout: 'fixed',
+        fontFamily: FONT_FAMILY,
+      }}
+    >
+      <colgroup>
+        {colWidths.map((w, i) => (
+          <col key={i} style={{ width: `${w}%` }} />
+        ))}
+      </colgroup>
+      <thead>
+        <tr>
+          {columns.map((col, i) => (
+            <th
+              key={i}
+              style={{
+                height: mm(LAYOUT.tableHeaderH),
+                textAlign: 'left',
+                padding: `0 ${mm(1.2)}`,
+                fontSize: '7.4pt',
+                fontWeight: 700,
+                color: '#111111',
+                textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                border: CELL_BORDER,
+                background: '#ffffff',
+                lineHeight: 1,
+              }}
+            >
+              {col.header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {pageData.length === 0 && pageIndex === 0 ? (
+          <tr>
+            <td
+              colSpan={columns.length}
+              style={{
+                textAlign: 'center',
+                padding: `${mm(8)} 0`,
+                color: '#9ca3af',
+                fontSize: '9pt',
+                fontStyle: 'italic',
+                border: CELL_BORDER,
+              }}
+            >
+              {emptyMessage}
+            </td>
+          </tr>
+        ) : (
+          pageData.map((row, ri) => (
+            <tr key={ri}>
+              {columns.map((col, ci) => (
+                <td
+                  key={ci}
+                  style={{
+                    height: mm(LAYOUT.rowH),
+                    textAlign: col.align || 'left',
+                    padding: `0 ${mm(1.2)}`,
+                    color: COLORS.text,
+                    verticalAlign: 'middle',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    fontSize: '7pt',
+                    lineHeight: 1,
+                    border: CELL_BORDER,
+                  }}
+                >
+                  {col.accessor(row)}
+                </td>
+              ))}
+            </tr>
+          ))
+        )}
+      </tbody>
+    </table>
+  );
+
+  // "Total:  Rs. 44500.00" style rows – label on the right, value under the last column
+  const renderSummaries = () => {
+    const lastColPct = Math.max(colWidths[colWidths.length - 1] ?? 15, 16);
+    return (
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          tableLayout: 'fixed',
+          fontFamily: FONT_FAMILY,
+          marginTop: '-0.3mm',
+        }}
+      >
+        <colgroup>
+          <col />
+          <col style={{ width: `${lastColPct}%` }} />
+        </colgroup>
+        <tbody>
+          {summaries!.map((s, i) => (
+            <tr key={i} style={{ background: s.highlight ? '#fef3c7' : '#ffffff' }}>
+              <td
+                style={{
+                  height: mm(LAYOUT.summaryRowH),
+                  textAlign: 'right',
+                  padding: `0 ${mm(1.2)}`,
+                  fontSize: '7.6pt',
+                  fontWeight: 800,
+                  color: '#111111',
+                  border: CELL_BORDER,
+                  lineHeight: 1,
+                }}
+              >
+                {s.label}:
+              </td>
+              <td
+                style={{
+                  height: mm(LAYOUT.summaryRowH),
+                  textAlign: 'right',
+                  padding: `0 ${mm(1.2)}`,
+                  fontSize: '7.6pt',
+                  fontWeight: 800,
+                  color: '#111111',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  border: CELL_BORDER,
+                  lineHeight: 1,
+                }}
+              >
+                {s.value}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     );
   };
 
-  const renderPages = () => {
-    const pages: JSX.Element[] = [];
+  const renderPages = (preview = false) => {
+    const nodes: React.ReactNode[] = [];
 
-    pageSlices.forEach((slice, p) => {
-      const pageData = data.slice(slice.start, slice.end);
+    pages.forEach((pageData, p) => {
+      const isLast = p === totalPages - 1;
+      const showTable = !(pageData.length === 0 && p > 0);
 
-      pages.push(
+      nodes.push(
         <div
           key={`page-${p}`}
           style={{
             width: mm(pageW),
             height: mm(pageH),
             position: 'relative',
-            pageBreakAfter: p < totalPages - 1 ? 'always' : 'auto',
-            breakAfter: p < totalPages - 1 ? 'page' : 'auto',
+            pageBreakAfter: !isLast ? 'always' : 'auto',
+            breakAfter: !isLast ? 'page' : 'auto',
             overflow: 'hidden',
             background: '#ffffff',
             boxSizing: 'border-box',
             margin: 0,
-            padding: `${mm(A4_CONFIG.marginYMm)} ${mm(A4_CONFIG.marginXMm)}`,
-            fontFamily: PRINT_FONT,
+            padding: 0,
+            fontFamily: FONT_FAMILY,
+            boxShadow: preview ? '0 1px 6px rgba(0,0,0,0.25)' : 'none',
           }}
         >
-          {renderReportHeader(slice.isFirst)}
-
-          <table
+          <div
             style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              tableLayout: 'fixed',
-              fontFamily: PRINT_FONT,
-              fontSize: '8pt',
-              color: '#000000',
+              position: 'absolute',
+              left: mm(LAYOUT.marginX),
+              right: mm(LAYOUT.marginX),
+              top: mm(LAYOUT.marginY),
             }}
           >
-            <thead>
-              <tr>
-                {columns.map((col, i) => (
-                  <th
-                    key={i}
-                    style={{
-                      fontWeight: 700,
-                      textAlign: col.align || 'left',
-                      padding: `${mm(0.9)} ${mm(1.2)}`,
-                      fontSize: '8pt',
-                      textTransform: 'uppercase',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      width: col.width || 'auto',
-                      border: CELL_BORDER,
-                      borderTop: HEADER_RULE,
-                      borderBottom: HEADER_RULE,
-                      verticalAlign: 'middle',
-                      lineHeight: 1.15,
-                    }}
-                  >
-                    {col.header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pageData.length === 0 && slice.isFirst ? (
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    style={{
-                      textAlign: 'center',
-                      padding: mm(6),
-                      fontSize: '9pt',
-                      fontStyle: 'italic',
-                      border: CELL_BORDER,
-                    }}
-                  >
-                    {emptyMessage}
-                  </td>
-                </tr>
-              ) : (
-                pageData.map((row, ri) => (
-                  <tr
-                    key={ri}
-                    style={{
-                      background: ri % 2 === 0 ? '#ffffff' : ROW_STRIPE,
-                    }}
-                  >
-                    {columns.map((col, ci) => {
-                      const val = col.accessor(row);
-                      const align = col.align || 'left';
-                      return (
-                        <td
-                          key={ci}
-                          style={{
-                            textAlign: align,
-                            padding: `${mm(0.65)} ${mm(1.2)}`,
-                            verticalAlign: 'middle',
-                            border: CELL_BORDER,
-                            wordBreak: 'break-word',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            fontSize: '8pt',
-                            lineHeight: 1.15,
-                            fontVariantNumeric: align === 'right' ? 'tabular-nums' : 'normal',
-                            textTransform:
-                              align === 'right' || align === 'center' ? 'none' : 'uppercase',
-                          }}
-                        >
-                          {typeof val === 'string' || typeof val === 'number' ? val : val}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))
-              )}
-            </tbody>
-            {slice.isLast && summaries && summaries.length > 0 && (
-              <tfoot>
-                {summaries.map((s, si) => (
-                  <tr key={si}>
-                    {columns.length > 1 ? (
-                      <>
-                        <td
-                          colSpan={columns.length - 1}
-                          style={{
-                            border: 'none',
-                            borderTop: si === 0 ? HEADER_RULE : 'none',
-                            padding: `${mm(1)} ${mm(1.2)}`,
-                            textAlign: 'right',
-                            fontWeight: 700,
-                            fontSize: '9pt',
-                            background: '#ffffff',
-                          }}
-                        >
-                          {s.label}:
-                        </td>
-                        <td
-                          style={{
-                            border: 'none',
-                            borderTop: si === 0 ? HEADER_RULE : 'none',
-                            padding: `${mm(1)} ${mm(1.2)}`,
-                            textAlign: 'right',
-                            fontWeight: 700,
-                            fontSize: '9pt',
-                            fontVariantNumeric: 'tabular-nums',
-                            background: '#ffffff',
-                          }}
-                        >
-                          {s.value}
-                        </td>
-                      </>
-                    ) : (
-                      <td
-                        colSpan={1}
-                        style={{
-                          border: 'none',
-                          borderTop: si === 0 ? HEADER_RULE : 'none',
-                          padding: `${mm(1)} ${mm(1.2)}`,
-                          textAlign: 'right',
-                          fontWeight: 700,
-                          fontSize: '9pt',
-                          background: '#ffffff',
-                        }}
-                      >
-                        {s.label}: {s.value}
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tfoot>
-            )}
-          </table>
+            {p === 0 ? renderFirstHeader() : renderCompactHeader(p)}
+            {showTable && renderTable(pageData, p)}
+            {isLast && hasSummaries && renderSummaries()}
+          </div>
 
           {totalPages > 1 && (
             <div
               style={{
-                marginTop: mm(2),
-                textAlign: 'right',
-                fontSize: '7.5pt',
-                color: '#000000',
+                position: 'absolute',
+                left: mm(LAYOUT.marginX),
+                right: mm(LAYOUT.marginX),
+                bottom: mm(LAYOUT.marginY - 3),
+                display: 'flex',
+                justifyContent: 'space-between',
+                fontSize: '6.5pt',
+                color: COLORS.muted,
               }}
             >
-              Page {p + 1} of {totalPages}
+              <span>Currency: {currency}</span>
+              <span>
+                Page {p + 1} / {totalPages}
+              </span>
             </div>
           )}
         </div>
       );
     });
 
-    return pages;
+    return nodes;
   };
+
+  // ---- Preview sizing ---------------------------------------------------------------
+  const previewScale = isLandscape ? 0.65 : 0.6;
+  const previewGapPx = 16;
+  const pagePxW = pageW * PX_PER_MM;
+  const pagePxH = pageH * PX_PER_MM;
+  const previewInnerH = pagePxH * totalPages + previewGapPx * (totalPages - 1);
 
   return (
     <div className="modal-overlay">
@@ -445,14 +524,14 @@ export function TablePrintModal<T>({
         </div>
 
         <div className="modal-body no-print space-y-4">
-          {filters && filters.length > 0 && (
+          {hasFilters && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="h-4 w-4 text-blue-600" />
                 <span className="text-sm font-semibold text-blue-900">Applied Filters</span>
               </div>
               <div className="flex flex-wrap gap-3">
-                {filters.map((f, i) => (
+                {filters!.map((f, i) => (
                   <div key={i} className="text-sm">
                     <span className="text-blue-700 font-medium">{f.label}: </span>
                     <span className="text-blue-900 font-bold">{f.value}</span>
@@ -465,7 +544,8 @@ export function TablePrintModal<T>({
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm">
             <div className="text-gray-600">
               <span className="font-semibold text-gray-900">{data.length}</span> records ·{' '}
-              <span className="font-semibold text-gray-900">{totalPages}</span> page{totalPages !== 1 ? 's' : ''}
+              <span className="font-semibold text-gray-900">{totalPages}</span> page
+              {totalPages !== 1 ? 's' : ''}
             </div>
             <div className="flex items-center gap-2 text-gray-500">
               <FileText className="h-4 w-4" />
@@ -473,27 +553,36 @@ export function TablePrintModal<T>({
             </div>
           </div>
 
-          <div className="bg-gray-100 border border-gray-200 rounded-2xl p-4 overflow-auto" style={{ maxHeight: '60vh' }}>
+          <div
+            className="bg-gray-100 border border-gray-200 rounded-2xl p-4 overflow-auto"
+            style={{ maxHeight: '60vh' }}
+          >
             <div
               style={{
-                transform: `scale(${isLandscape ? 0.65 : 0.55})`,
-                transformOrigin: 'top left',
-                width: isLandscape ? `${A4_CONFIG.pageWidthMm * 3.7795}px` : `${A4_CONFIG.portraitWidthMm * 3.7795}px`,
-                height: isLandscape ? `${A4_CONFIG.pageHeightMm * 3.7795 * totalPages + 40 * totalPages}px` : `${A4_CONFIG.portraitHeightMm * 3.7795 * totalPages + 40 * totalPages}px`,
+                width: `${pagePxW * previewScale}px`,
+                height: `${previewInnerH * previewScale}px`,
                 position: 'relative',
-                flexShrink: 0,
+                margin: '0 auto',
               }}
             >
-              {renderPages()}
+              <div
+                style={{
+                  transform: `scale(${previewScale})`,
+                  transformOrigin: 'top left',
+                  width: `${pagePxW}px`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: `${previewGapPx}px`,
+                }}
+              >
+                {renderPages(true)}
+              </div>
             </div>
           </div>
         </div>
 
-        <div
-          id="table-print-sheet"
-          style={{ display: 'none' }}
-        >
-          {renderPages()}
+        <div id="table-print-sheet" style={{ display: 'none' }}>
+          {renderPages(false)}
         </div>
 
         <div className="modal-footer no-print">
@@ -512,14 +601,7 @@ export function TablePrintModal<T>({
 
         <style>{`
           @page {
-            margin: 0;
-          }
-          @page table-landscape {
-            size: A4 landscape;
-            margin: 0;
-          }
-          @page table-portrait {
-            size: A4 portrait;
+            size: A4 ${orientation};
             margin: 0;
           }
           @media print {
@@ -551,12 +633,6 @@ export function TablePrintModal<T>({
               background: #ffffff !important;
               box-sizing: border-box !important;
               visibility: visible !important;
-            }
-            #table-print-root[data-print-orientation="landscape"] {
-              page: table-landscape !important;
-            }
-            #table-print-root[data-print-orientation="portrait"] {
-              page: table-portrait !important;
             }
             #table-print-root > div {
               margin: 0 !important;
