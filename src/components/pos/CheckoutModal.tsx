@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, CreditCard, Banknote, Smartphone, Check, Receipt, AlertCircle, Gift } from 'lucide-react';
+import { X, Banknote, Smartphone, Check, Gift } from 'lucide-react';
 import { Sale, CardDetails, AppliedDiscount, CartItem, Payment } from '../../types';
 import { useApp, checkDiscountEligibility, useInvoiceGeneration } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -154,6 +154,13 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || payments.length > 0) return;
+    if ((paymentMethod === 'cash' || paymentMethod === 'digital') && (!amountPaid || Number(amountPaid) === 0)) {
+      setAmountPaid(total.toFixed(2));
+    }
+  }, [isOpen, paymentMethod, total, payments.length, amountPaid]);
+
   // Check for applicable automatic discounts
   useEffect(() => {
     if (!isOpen || state.cart.length === 0) return;
@@ -271,7 +278,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   // Check if payment can be processed
   const canProcessPayment = () => {
     if (isProcessing) return false;
-    // If there are split payments, require that payments equal total
     if (payments.length > 0) {
       const sum = payments.reduce((s, p) => s + p.amount, 0);
       return Math.abs(sum - total) < 0.01;
@@ -280,17 +286,8 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     switch (paymentMethod) {
       case 'cash':
         return amountPaid && parseFloat(amountPaid) >= total;
-      case 'card':
-        return cardDetails.bankName && 
-               cardDetails.holderName && 
-               cardDetails.cardNumber && 
-               cardDetails.cardType !== 'unknown' &&
-               ((cardDetails.cardType === 'amex' && cardDetails.cardNumber.replace(/\s/g, '').length === 15) ||
-                (cardDetails.cardType !== 'amex' && cardDetails.cardNumber.replace(/\s/g, '').length === 16));
-      case 'credit':
-        return canPayWithCredit;
       case 'digital':
-        return true;
+        return amountPaid && parseFloat(amountPaid) >= total;
       default:
         return false;
     }
@@ -310,14 +307,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       id: Date.now().toString(),
       method: pendingPayment.method,
       amount: amt,
-      cardDetails: pendingPayment.method === 'card' ? {
-        id: Date.now().toString(),
-        bankName: cardDetails.bankName || '',
-        cardType: cardDetails.cardType || 'unknown',
-        cardNumber: cardDetails.cardNumber || '',
-        lastFourDigits: cardDetails.lastFourDigits || '',
-        holderName: cardDetails.holderName || ''
-      } : undefined
+      cardDetails: undefined,
     };
     setPayments(prev => [...prev, newPayment]);
     setPendingPayment({ ...pendingPayment, amount: '' });
@@ -356,8 +346,8 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       const salePayments: Payment[] = payments.length > 0 ? payments : [{
         id: Date.now().toString(),
         method: paymentMethod as Payment['method'],
-        amount: paymentMethod === 'cash' ? parseFloat(amountPaid || '0') : total,
-        cardDetails: paymentMethod === 'card' ? { ...cardDetails as CardDetails, id: Date.now().toString() } : undefined
+        amount: parseFloat(amountPaid || '0') || total,
+        cardDetails: undefined,
       }];
 
       const sale: Sale = {
@@ -560,67 +550,12 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                 </div>
               )}
 
-              {/* Manual Bill Discount */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className={`font-semibold text-gray-900 ${isTouchMode ? 'text-lg' : 'text-base'}`}>
-                    Bill Discount
-                  </h3>
-                  {billDiscountAmount > 0 && (
-                    <button
-                      type="button"
-                      onClick={clearBillDiscount}
-                      className="text-xs text-red-600 hover:text-red-700"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={billDiscountType}
-                    onChange={(e) => {
-                      setBillDiscountType(e.target.value as 'percentage' | 'fixed');
-                      setBillDiscountValue('');
-                      setBillDiscountAmount(0);
-                    }}
-                    className="select w-24"
-                  >
-                    <option value="percentage">%</option>
-                    <option value="fixed">LKR</option>
-                  </select>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={billDiscountValue}
-                    onChange={(e) => setBillDiscountValue(e.target.value)}
-                    className="input flex-1"
-                    placeholder={billDiscountType === 'percentage' ? 'Discount %' : 'Discount amount'}
-                  />
-                  <button
-                    type="button"
-                    onClick={applyBillDiscount}
-                    className="btn btn-primary btn-sm"
-                  >
-                    Apply
-                  </button>
-                </div>
-
-                {billDiscountAmount > 0 && (
-                  <div className="mt-3 text-sm text-green-700 font-medium">
-                    Applied discount: -{state.settings.currency} {billDiscountAmount.toFixed(2)}
-                  </div>
-                )}
-              </div>
-
               {/* Order Summary */}
               <div>
                 <h3 className={`font-semibold text-gray-900 mb-4 ${isTouchMode ? 'text-lg' : 'text-base'}`}>
                   Order Summary
                 </h3>
-                
+
                 <div className="space-y-2 mb-4 max-h-32 overflow-y-auto">
                   {state.cart.map((item, index) => (
                     <div key={index} className="flex justify-between text-sm">
@@ -664,29 +599,81 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                 </div>
               </div>
 
-              {/* Payment Method */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <h3 className={`font-semibold text-gray-900 mb-3 ${isTouchMode ? 'text-lg' : 'text-base'}`}>
+                  Payment Summary
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total:</span>
+                    <span>{state.settings.currency} {subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Discount (%):</span>
+                    <span>{billDiscountType === 'percentage' && billDiscountValue ? `${billDiscountValue}%` : '0%'}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t border-gray-200 pt-2">
+                    <span>Amount:</span>
+                    <span>{state.settings.currency} {total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center space-x-2">
+                  <select
+                    value={billDiscountType}
+                    onChange={(e) => {
+                      setBillDiscountType(e.target.value as 'percentage' | 'fixed');
+                      setBillDiscountValue('');
+                      setBillDiscountAmount(0);
+                    }}
+                    className="select w-24"
+                  >
+                    <option value="percentage">%</option>
+                    <option value="fixed">LKR</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={billDiscountValue}
+                    onChange={(e) => setBillDiscountValue(e.target.value)}
+                    className="input flex-1"
+                    placeholder={billDiscountType === 'percentage' ? 'Discount %' : 'Discount amount'}
+                  />
+                  <button type="button" onClick={applyBillDiscount} className="btn btn-primary btn-sm">
+                    Apply
+                  </button>
+                  {billDiscountAmount > 0 && (
+                    <button type="button" onClick={clearBillDiscount} className="text-xs text-red-600 hover:text-red-700">
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <h3 className={`font-semibold text-gray-900 mb-4 ${isTouchMode ? 'text-lg' : 'text-base'}`}>
-                  Payment Method
+                  Payment Collection
                 </h3>
-                
+
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     { id: 'cash', label: 'Cash', icon: Banknote },
-                    { id: 'card', label: 'Card', icon: CreditCard },
                     { id: 'digital', label: 'Digital', icon: Smartphone },
-                    { id: 'credit', label: 'Credit', icon: Receipt },
                   ].map(({ id, label, icon: Icon }) => (
                     <button
                       key={id}
-                      onClick={() => setPaymentMethod(id)}
-                      disabled={id === 'credit' && !canPayWithCredit}
+                      onClick={() => {
+                        setPaymentMethod(id);
+                        if (!amountPaid || Number(amountPaid) === 0) {
+                          setAmountPaid(total.toFixed(2));
+                        }
+                      }}
                       className={`flex flex-col items-center space-y-2 p-4 rounded-2xl border-2 transition-all ${
                         paymentMethod === id
                           ? 'border-blue-500 bg-blue-50 text-blue-700'
                           : 'border-gray-200 hover:border-gray-300'
-                      } ${id === 'credit' && !canPayWithCredit ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                      ${isTouchMode ? 'min-h-[80px]' : 'min-h-[70px]'}`}
+                      } ${isTouchMode ? 'min-h-[80px]' : 'min-h-[70px]'}`}
                     >
                       <Icon className={`${isTouchMode ? 'h-6 w-6' : 'h-5 w-5'}`} />
                       <span className={`font-medium ${isTouchMode ? 'text-sm' : 'text-xs'}`}>
@@ -696,7 +683,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                   ))}
                 </div>
 
-                {/* Split Payments controls */}
                 <div className="mt-4">
                   <h4 className="font-semibold">Split Payments</h4>
                   <div className="flex items-center space-x-2 mt-2">
@@ -706,9 +692,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       className="select"
                     >
                       <option value="cash">Cash</option>
-                      <option value="card">Card</option>
                       <option value="digital">Digital</option>
-                      <option value="credit">Credit</option>
                     </select>
                     <input
                       type="number"
@@ -726,7 +710,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       <div key={p.id} className="flex justify-between items-center p-2 border rounded">
                         <div>
                           <div className="font-medium">{p.method.toUpperCase()}</div>
-                          <div className="text-sm text-gray-600">{p.cardDetails ? `${p.cardDetails.cardType} ••••${p.cardDetails.lastFourDigits}` : ''}</div>
                         </div>
                         <div className="flex items-center space-x-2">
                           <div className="font-semibold">{state.settings.currency} {p.amount.toFixed(2)}</div>
@@ -737,51 +720,17 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                   </div>
 
                   <div className="mt-2 text-sm">
-                    <div>Remaining: <span className="font-semibold">{state.settings.currency} {remaining.toFixed(2)}</span></div>
+                    <div>Remaining to Pay: <span className="font-semibold">{state.settings.currency} {remaining.toFixed(2)}</span></div>
                   </div>
                 </div>
-
-                {/* Credit Payment Warning */}
-                {paymentMethod === 'credit' && !canPayWithCredit && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-2">
-                    <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                    <span className="text-red-700 text-sm">
-                      {state.selectedCustomer 
-                        ? 'Insufficient credit limit' 
-                        : 'Please select a customer for credit payment'
-                      }
-                    </span>
-                  </div>
-                )}
-
-                {/* Credit Available Info */}
-                {paymentMethod === 'credit' && state.selectedCustomer && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                    <div className="text-sm text-blue-800">
-                      <div className="flex justify-between">
-                        <span>Credit Limit:</span>
-                        <span>{state.settings.currency} {state.selectedCustomer.creditLimit.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Used:</span>
-                        <span>{state.settings.currency} {state.selectedCustomer.creditUsed.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between font-semibold border-t border-blue-200 pt-1 mt-1">
-                        <span>Available:</span>
-                        <span>{state.settings.currency} {(state.selectedCustomer.creditLimit - state.selectedCustomer.creditUsed).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Cash Payment */}
-              {paymentMethod === 'cash' && (
+              {(paymentMethod === 'cash' || paymentMethod === 'digital') && (
                 <div>
                   <h3 className={`font-semibold text-gray-900 mb-4 ${isTouchMode ? 'text-lg' : 'text-base'}`}>
-                    Cash Payment
+                    {paymentMethod === 'cash' ? 'Cash Payment' : 'Digital Payment'}
                   </h3>
-                  
+
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -798,7 +747,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                         disabled={isProcessing}
                       />
                     </div>
-                    
+
                     {amountPaid && parseFloat(amountPaid) >= total && (
                       <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                         <div className="flex justify-between items-center">
@@ -810,92 +759,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* Card Payment Details */}
-              {paymentMethod === 'card' && (
-                <div>
-                  <h3 className={`font-semibold text-gray-900 mb-4 ${isTouchMode ? 'text-lg' : 'text-base'}`}>
-                    Card Details
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Bank Name *
-                      </label>
-                      <select
-                        value={cardDetails.bankName}
-                        onChange={(e) => setCardDetails(prev => ({ ...prev, bankName: e.target.value }))}
-                        className="select"
-                        disabled={isProcessing}
-                      >
-                        <option value="">Select Bank</option>
-                        {sriLankanBanks.map((bank) => (
-                          <option key={bank} value={bank}>{bank}</option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Card Number *
-                      </label>
-                      <input
-                        type="text"
-                        value={cardDetails.cardNumber}
-                        onChange={(e) => handleCardNumberChange(e.target.value)}
-                        className="input"
-                        placeholder="Enter card number"
-                        disabled={isProcessing}
-                        maxLength={cardDetails.cardType === 'amex' ? 17 : 19} // Including spaces
-                      />
-                      {cardDetails.cardType !== 'unknown' && cardDetails.cardNumber && (
-                        <div className="mt-2 flex items-center space-x-2">
-                          <span className="text-sm text-gray-600">Detected:</span>
-                          <span className="text-sm font-medium capitalize text-blue-600">
-                            {cardDetails.cardType}
-                          </span>
-                          {cardDetails.cardType === 'visa' && <span className="text-blue-600">💳</span>}
-                          {cardDetails.cardType === 'mastercard' && <span className="text-red-600">💳</span>}
-                          {cardDetails.cardType === 'amex' && <span className="text-green-600">💳</span>}
-                          {cardDetails.cardType === 'discover' && <span className="text-orange-600">💳</span>}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Card Holder Name *
-                      </label>
-                      <input
-                        type="text"
-                        value={cardDetails.holderName}
-                        onChange={(e) => setCardDetails(prev => ({ ...prev, holderName: e.target.value }))}
-                        className="input"
-                        placeholder="Name on card"
-                        disabled={isProcessing}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Credit Notes */}
-              {paymentMethod === 'credit' && (
-                <div>
-                  <h3 className={`font-semibold text-gray-900 mb-4 ${isTouchMode ? 'text-lg' : 'text-base'}`}>
-                    Credit Notes
-                  </h3>
-                  <textarea
-                    value={creditNotes}
-                    onChange={(e) => setCreditNotes(e.target.value)}
-                    placeholder="Add notes for credit transaction..."
-                    className="textarea"
-                    rows={3}
-                    disabled={isProcessing}
-                  />
                 </div>
               )}
             </div>
