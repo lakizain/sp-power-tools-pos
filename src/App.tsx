@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp, useFeatureToggles } from './context/SupabaseAppContext';
 import { CurrencyProvider } from './context/CurrencyContext';
@@ -110,6 +110,24 @@ function AppContent() {
   const { state } = useApp();
   const features = useFeatureToggles();
   const [currentView, setCurrentView] = useState('pos');
+  const userRole = state.currentUser?.role;
+
+  useEffect(() => {
+    if (!userRole) return;
+
+    const isRestrictedView =
+      (userRole === 'cashier' && currentView !== 'pos') ||
+      ((currentView === 'transactions' || currentView === 'inventory' || currentView === 'customers' || currentView === 'reports') &&
+        !(userRole === 'admin' || userRole === 'manager')) ||
+      ((currentView === 'discounts' || currentView === 'suppliers' || currentView === 'expenses' || currentView === 'returns' ||
+        currentView === 'rentals' || currentView === 'payments' || currentView === 'alerts') &&
+        !(userRole === 'admin' || userRole === 'manager')) ||
+      (currentView === 'users' && userRole !== 'admin');
+
+    if (isRestrictedView) {
+      setCurrentView('pos');
+    }
+  }, [currentView, userRole, features]);
 
   // Show loading spinner while auth is loading
   if (loading) {
@@ -126,103 +144,68 @@ function AppContent() {
   }
 
   const renderCurrentView = () => {
-    const userRole = state.currentUser?.role;
-
-    // Restrict cashiers to POS only
-    if (userRole === 'cashier' && currentView !== 'pos') {
-      setCurrentView('pos');
-      return <POSTerminal />;
-    }
-
     switch (currentView) {
       case 'pos':
         return <POSTerminal />;
       case 'transactions':
-        // Only allow admin and manager to access transactions
         if (userRole === 'admin' || userRole === 'manager') {
           return <TransactionsManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'inventory':
-        // Only allow admin and manager to access inventory
         if (userRole === 'admin' || userRole === 'manager') {
           return <InventoryManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'customers':
-        // Only allow admin and manager to access customers
         if (userRole === 'admin' || userRole === 'manager') {
           return <CustomerManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'reports':
-        // Only allow admin and manager to access reports
         if (userRole === 'admin' || userRole === 'manager') {
           return <ReportsManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'discounts':
-        // Only allow admin and manager to access discounts - also gated by feature toggle
         if ((userRole === 'admin' || userRole === 'manager') && features.productDiscount) {
           return <DiscountManager />;
         }
-        if (!features.productDiscount && (userRole === 'admin' || userRole === 'manager')) {
-          setCurrentView('pos');
-        }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'suppliers':
-        // Only allow admin and manager to access suppliers - gated by feature toggle
         if ((userRole === 'admin' || userRole === 'manager') && features.supplierManagement) {
           return <SupplierManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'expenses':
-        // Only allow admin and manager to access expenses - gated by feature toggle
         if ((userRole === 'admin' || userRole === 'manager') && features.expenseTracking) {
           return <ExpenseManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'returns':
-        // Only allow admin and manager to access returns - gated by feature toggle
         if ((userRole === 'admin' || userRole === 'manager') && features.productReturns) {
           return <ReturnsManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'rentals':
-        // Only allow admin and manager to access rentals - gated by feature toggle
         if ((userRole === 'admin' || userRole === 'manager') && features.productRentals) {
           return <RentalsManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'payments':
-        // Only allow admin and manager to access outstanding payments - gated by feature toggle
         if ((userRole === 'admin' || userRole === 'manager') && features.outstandingPayments) {
           return <OutstandingPayments />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'alerts':
-        // Only allow admin and manager to access alerts - gated by feature toggle
         if ((userRole === 'admin' || userRole === 'manager') && features.alertMonitoring) {
           return <AlertManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'users':
-        // Only allow admin to access users
         if (userRole === 'admin') {
           return <UserManager />;
         }
-        setCurrentView('pos');
         return <POSTerminal />;
       case 'settings':
         return <Settings />;

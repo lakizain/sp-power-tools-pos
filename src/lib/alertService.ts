@@ -159,14 +159,16 @@ export class AlertService {
 
     private async initializeServices() {
         try {
-            // Get notification service configurations
+            // Get notification service configurations. Some installs do not have default
+            // rows configured yet, so this must be tolerant rather than throwing a 406.
             const { data: emailConfigs, error: emailError } = await supabase
                 .from('notification_service_config')
                 .select('*')
                 .eq('service_type', 'email')
                 .eq('is_active', true)
                 .eq('is_default', true)
-                .single();
+                .limit(1)
+                .maybeSingle();
 
             const { data: smsConfigs, error: smsError } = await supabase
                 .from('notification_service_config')
@@ -174,13 +176,18 @@ export class AlertService {
                 .eq('service_type', 'sms')
                 .eq('is_active', true)
                 .eq('is_default', true)
-                .single();
+                .limit(1)
+                .maybeSingle();
 
-            if (!emailError && emailConfigs) {
+            if (emailError) {
+                console.warn('No default email notification config found or configuration query failed:', emailError.message);
+            } else if (emailConfigs) {
                 this.emailService = this.createEmailService(emailConfigs);
             }
 
-            if (!smsError && smsConfigs) {
+            if (smsError) {
+                console.warn('No default SMS notification config found or configuration query failed:', smsError.message);
+            } else if (smsConfigs) {
                 this.smsService = this.createSMSService(smsConfigs);
             }
         } catch (error) {
