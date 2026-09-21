@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Printer, FolderPlus, CalendarRange, Download, SlidersHorizontal, Tag, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle, TrendingUp, TrendingDown, Printer, FolderPlus, CalendarRange, Download, SlidersHorizontal, Tag, ArrowUpDown, RotateCcw } from 'lucide-react';
 import { Product, ProductCategory, Supplier } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { ProductModal } from './ProductModal';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
 import { CategoryModal } from './CategoryModal';
@@ -13,6 +15,7 @@ import { TablePrintModal, PrintColumn, PrintSummary, PrintFilterInfo } from '../
 
 export function InventoryManager() {
   const { state } = useApp();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showProductModal, setShowProductModal] = useState(false);
@@ -31,6 +34,7 @@ export function InventoryManager() {
   const [customToDate, setCustomToDate] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
+  const [manualCheckedProductIds, setManualCheckedProductIds] = useState<Set<string>>(new Set());
   const [showStockAdjustModal, setShowStockAdjustModal] = useState(false);
   const [stockAdjustProducts, setStockAdjustProducts] = useState<Product[]>([]);
 
@@ -57,6 +61,35 @@ export function InventoryManager() {
   useEffect(() => {
     loadDbCategories();
     loadSuppliers();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadManualChecks = async () => {
+      try {
+        const { inventoryProductChecksService } = await import('../../lib/services');
+        const checkedProductIds = await inventoryProductChecksService.getCheckedProductIds();
+        if (isMounted) setManualCheckedProductIds(new Set(checkedProductIds));
+      } catch (error) {
+        console.error('Error loading temporary inventory checks:', error);
+      }
+    };
+
+    loadManualChecks();
+    const channel = supabase
+      .channel('inventory-product-checks-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'inventory_product_checks' },
+        () => loadManualChecks()
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const activeDbCategoryNames = dbCategories.filter(c => c.active).map(c => c.name);
@@ -340,6 +373,48 @@ export function InventoryManager() {
     }
   };
 
+  const handleToggleManualCheck = async (productId: string) => {
+    const isChecked = manualCheckedProductIds.has(productId);
+    setManualCheckedProductIds(prev => {
+      const next = new Set(prev);
+      if (isChecked) next.delete(productId);
+      else next.add(productId);
+      return next;
+    });
+
+    try {
+      const { inventoryProductChecksService } = await import('../../lib/services');
+      if (isChecked) {
+        await inventoryProductChecksService.setUnchecked(productId);
+      } else {
+        await inventoryProductChecksService.setChecked(productId, user?.id);
+      }
+    } catch (error) {
+      setManualCheckedProductIds(prev => {
+        const next = new Set(prev);
+        if (isChecked) next.add(productId);
+        else next.delete(productId);
+        return next;
+      });
+      console.error('Error updating temporary inventory check:', error);
+      swalConfig.error('Could not sync this check. Please try again.');
+    }
+  };
+
+  const handleClearManualChecks = async () => {
+    const previousChecks = manualCheckedProductIds;
+    setManualCheckedProductIds(new Set());
+
+    try {
+      const { inventoryProductChecksService } = await import('../../lib/services');
+      await inventoryProductChecksService.clear();
+    } catch (error) {
+      setManualCheckedProductIds(previousChecks);
+      console.error('Error clearing temporary inventory checks:', error);
+      swalConfig.error('Could not clear checks. Please try again.');
+    }
+  };
+
   const handleSingleStockAdjust = (product: Product) => {
     setStockAdjustProducts([product]);
     setShowStockAdjustModal(true);
@@ -593,6 +668,22 @@ export function InventoryManager() {
 
       {/* Products Table */}
       <div className="card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-white px-6 py-3">
+          <div className="text-sm text-gray-600">
+            Temporary manual checks: <span className="font-semibold text-gray-900">{manualCheckedProductIds.size}</span>
+          </div>
+          {manualCheckedProductIds.size > 0 && (
+            <button
+              type="button"
+              onClick={handleClearManualChecks}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+              title="Clear all temporary product checks"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>Clear checks</span>
+            </button>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="table">
             <thead className="table-header">
@@ -606,6 +697,7 @@ export function InventoryManager() {
                   />
                 </th>
                 <th className="table-header-cell">Product</th>
+                <th className="table-header-cell">Manual Check</th>
                 <th className="table-header-cell">SKU</th>
                 <th className="table-header-cell">Category</th>
                 <th className="table-header-cell">Price</th>
@@ -620,6 +712,7 @@ export function InventoryManager() {
                 const isLowStock = product.trackInventory && product.stock <= product.minStock;
                 const isOutOfStock = product.trackInventory && product.stock === 0;
                 const isSelected = selectedProductIds.has(product.id);
+                const isManualChecked = manualCheckedProductIds.has(product.id);
                 
                 return (
                   <tr key={product.id} className={`table-row ${isSelected ? 'bg-indigo-50/50' : ''}`}>
@@ -641,6 +734,20 @@ export function InventoryManager() {
                           <div className="text-xs text-gray-500 truncate">{product.description}</div>
                         </div>
                       </div>
+                    </td>
+                    <td className="table-cell">
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600">
+                        <input
+                          type="checkbox"
+                          checked={isManualChecked}
+                          onChange={() => handleToggleManualCheck(product.id)}
+                          className="h-4 w-4 cursor-pointer rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          aria-label={`Mark ${product.name} as found in manual list`}
+                        />
+                        <span className={isManualChecked ? 'font-medium text-green-700' : ''}>
+                          {isManualChecked ? 'Checked' : 'Check'}
+                        </span>
+                      </label>
                     </td>
                     <td className="table-cell font-mono text-sm">{product.sku}</td>
                     <td className="table-cell">

@@ -87,6 +87,30 @@ export interface Database {
         };
       };
 
+      inventory_product_checks: {
+        Row: {
+          id: string;
+          product_id: string;
+          checked_by: string | null;
+          checked_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          product_id: string;
+          checked_by?: string | null;
+          checked_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          product_id?: string;
+          checked_by?: string | null;
+          checked_at?: string;
+          updated_at?: string;
+        };
+      };
+
       categories: {
         Row: {
           id: string;

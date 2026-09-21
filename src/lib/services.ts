@@ -341,6 +341,48 @@ export const stockAdjustmentsService = {
   },
 }
 
+export const inventoryProductChecksService = {
+  async getCheckedProductIds(): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('inventory_product_checks')
+      .select('product_id');
+
+    if (error) throw error;
+    return data.map(check => check.product_id);
+  },
+
+  async setChecked(productId: string, userId?: string): Promise<void> {
+    const { error } = await supabase
+      .from('inventory_product_checks')
+      .upsert({
+        product_id: productId,
+        checked_by: userId || null,
+        checked_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'product_id' });
+
+    if (error) throw error;
+  },
+
+  async setUnchecked(productId: string): Promise<void> {
+    const { error } = await supabase
+      .from('inventory_product_checks')
+      .delete()
+      .eq('product_id', productId);
+
+    if (error) throw error;
+  },
+
+  async clear(): Promise<void> {
+    const { error } = await supabase
+      .from('inventory_product_checks')
+      .delete()
+      .not('product_id', 'is', null);
+
+    if (error) throw error;
+  },
+};
+
 // Customers Service
 export const customersService = {
   async getAll(): Promise<Customer[]> {
