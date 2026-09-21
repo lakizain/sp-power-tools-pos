@@ -131,6 +131,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     return sum + (price * item.quantity);
   }, 0);
   const manualDiscount = state.cart.reduce((sum, item) => sum + (item.discount || 0), 0);
+  const initialTotal = Math.max(0, subtotal - manualDiscount - billDiscountAmount);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -157,9 +158,9 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   useEffect(() => {
     if (!isOpen || payments.length > 0) return;
     if ((paymentMethod === 'cash' || paymentMethod === 'digital') && (!amountPaid || Number(amountPaid) === 0)) {
-      setAmountPaid(total.toFixed(2));
+      setAmountPaid(initialTotal.toFixed(2));
     }
-  }, [isOpen, paymentMethod, total, payments.length, amountPaid]);
+  }, [isOpen, paymentMethod, initialTotal, payments.length, amountPaid]);
 
   // Check for applicable automatic discounts
   useEffect(() => {

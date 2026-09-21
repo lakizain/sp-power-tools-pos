@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode } fr
 import { CurrencyConfig, ExchangeRate, CurrencyConversion } from '../types';
 import { CurrencyUtils, getSupportedCurrencies, getCurrentExchangeRate, convertCurrency, formatCurrency } from '../lib/currencyUtils';
 import { exchangeRateService } from '../lib/exchangeRateService';
+import { useAuth } from './AuthContext';
 
 // Currency state interface
 interface CurrencyState {
@@ -96,6 +97,7 @@ interface CurrencyProviderProps {
 }
 
 export function CurrencyProvider({ children, initialDisplayCurrency = 'LKR' }: CurrencyProviderProps) {
+    const { user } = useAuth();
     const [state, dispatch] = useReducer(currencyReducer, {
         ...initialState,
         displayCurrency: initialDisplayCurrency,
@@ -200,22 +202,29 @@ export function CurrencyProvider({ children, initialDisplayCurrency = 'LKR' }: C
     useEffect(() => {
         const initialize = async () => {
             await loadSupportedCurrencies();
-            await loadBaseCurrency();
+            if (user) {
+                await loadBaseCurrency();
+            }
         };
 
         initialize();
-    }, []);
+    }, [user]);
 
     // Load exchange rates when base currency changes
     useEffect(() => {
-        if (state.baseCurrency) {
+        if (state.baseCurrency && user) {
             loadExchangeRates();
         }
-    }, [state.baseCurrency]);
+    }, [state.baseCurrency, user]);
 
     // Initialize exchange rate service
     useEffect(() => {
         const initializeService = async () => {
+            if (!user) {
+                dispatch({ type: 'SET_LAST_UPDATE_TIME', payload: null });
+                return;
+            }
+
             try {
                 await exchangeRateService.initialize();
                 dispatch({ type: 'SET_LAST_UPDATE_TIME', payload: exchangeRateService.getLastUpdateTime() });
@@ -225,7 +234,7 @@ export function CurrencyProvider({ children, initialDisplayCurrency = 'LKR' }: C
         };
 
         initializeService();
-    }, []);
+    }, [user]);
 
     const contextValue: CurrencyContextType = {
         state,

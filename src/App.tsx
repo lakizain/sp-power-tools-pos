@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, type ComponentType } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp, useFeatureToggles } from './context/SupabaseAppContext';
 import { CurrencyProvider } from './context/CurrencyContext';
@@ -6,22 +6,29 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LoadingSpinner } from './components/ui/LoadingComponents';
 import { LoginPage } from './components/auth/LoginPage';
 import { Header } from './components/layout/Header';
-import { POSTerminal } from './components/pos/POSTerminal';
-import { TransactionsManager } from './components/transactions/TransactionsManager';
-import { InventoryManager } from './components/inventory/InventoryManager';
-import { CustomerManager } from './components/customers/CustomerManager';
-import { ReportsManager } from './components/reports/ReportsManager';
-import { Settings } from './components/settings/Settings';
-import { DiscountManager } from './components/discounts/DiscountManager';
-import { UserManager } from './components/users/UserManager';
-import { SupplierManager } from './components/suppliers/SupplierManager';
-import { ExpenseManager } from './components/expenses/ExpenseManager';
-import { ReturnsManager } from './components/returns/ReturnsManager';
-import { OutstandingPayments } from './components/payments/OutstandingPayments';
-import { AlertManager } from './components/alerts/AlertManager';
-import { RentalsManager } from './components/rentals/RentalsManager';
 import { isSupabaseConfigured, getMissingSupabaseEnvMessage } from './lib/supabase';
 import { AlertTriangle, Settings as SettingsIcon, ArrowRight } from 'lucide-react';
+
+const POSTerminal = lazy(() => import('./components/pos/POSTerminal').then((module) => ({ default: module.POSTerminal })));
+const TransactionsManager = lazy(() => import('./components/transactions/TransactionsManager').then((module) => ({ default: module.TransactionsManager })));
+const InventoryManager = lazy(() => import('./components/inventory/InventoryManager').then((module) => ({ default: module.InventoryManager })));
+const CustomerManager = lazy(() => import('./components/customers/CustomerManager').then((module) => ({ default: module.CustomerManager })));
+const ReportsManager = lazy(() => import('./components/reports/ReportsManager').then((module) => ({ default: module.ReportsManager })));
+const Settings = lazy(() => import('./components/settings/Settings').then((module) => ({ default: module.Settings })));
+const DiscountManager = lazy(() => import('./components/discounts/DiscountManager').then((module) => ({ default: module.DiscountManager })));
+const UserManager = lazy(() => import('./components/users/UserManager').then((module) => ({ default: module.UserManager })));
+const SupplierManager = lazy(() => import('./components/suppliers/SupplierManager').then((module) => ({ default: module.SupplierManager })));
+const ExpenseManager = lazy(() => import('./components/expenses/ExpenseManager').then((module) => ({ default: module.ExpenseManager })));
+const ReturnsManager = lazy(() => import('./components/returns/ReturnsManager').then((module) => ({ default: module.ReturnsManager })));
+const OutstandingPayments = lazy(() => import('./components/payments/OutstandingPayments').then((module) => ({ default: module.OutstandingPayments })));
+const AlertManager = lazy(() => import('./components/alerts/AlertManager').then((module) => ({ default: module.AlertManager })));
+const RentalsManager = lazy(() => import('./components/rentals/RentalsManager').then((module) => ({ default: module.RentalsManager })));
+
+const withSuspense = (Component: ComponentType) => (
+  <Suspense fallback={<div className="flex h-full min-h-[320px] items-center justify-center"><LoadingSpinner size="lg" text="Loading view..." /></div>}>
+    <Component />
+  </Suspense>
+);
 
 function MissingEnvScreen() {
   const msg = getMissingSupabaseEnvMessage();
@@ -146,71 +153,71 @@ function AppContent() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'pos':
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'transactions':
         if (userRole === 'admin' || userRole === 'manager') {
-          return <TransactionsManager />;
+          return withSuspense(TransactionsManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'inventory':
         if (userRole === 'admin' || userRole === 'manager') {
-          return <InventoryManager />;
+          return withSuspense(InventoryManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'customers':
         if (userRole === 'admin' || userRole === 'manager') {
-          return <CustomerManager />;
+          return withSuspense(CustomerManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'reports':
         if (userRole === 'admin' || userRole === 'manager') {
-          return <ReportsManager />;
+          return withSuspense(ReportsManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'discounts':
         if ((userRole === 'admin' || userRole === 'manager') && features.productDiscount) {
-          return <DiscountManager />;
+          return withSuspense(DiscountManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'suppliers':
         if ((userRole === 'admin' || userRole === 'manager') && features.supplierManagement) {
-          return <SupplierManager />;
+          return withSuspense(SupplierManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'expenses':
         if ((userRole === 'admin' || userRole === 'manager') && features.expenseTracking) {
-          return <ExpenseManager />;
+          return withSuspense(ExpenseManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'returns':
         if ((userRole === 'admin' || userRole === 'manager') && features.productReturns) {
-          return <ReturnsManager />;
+          return withSuspense(ReturnsManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'rentals':
         if ((userRole === 'admin' || userRole === 'manager') && features.productRentals) {
-          return <RentalsManager />;
+          return withSuspense(RentalsManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'payments':
         if ((userRole === 'admin' || userRole === 'manager') && features.outstandingPayments) {
-          return <OutstandingPayments />;
+          return withSuspense(OutstandingPayments);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'alerts':
         if ((userRole === 'admin' || userRole === 'manager') && features.alertMonitoring) {
-          return <AlertManager />;
+          return withSuspense(AlertManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'users':
         if (userRole === 'admin') {
-          return <UserManager />;
+          return withSuspense(UserManager);
         }
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
       case 'settings':
-        return <Settings />;
+        return withSuspense(Settings);
       default:
-        return <POSTerminal />;
+        return withSuspense(POSTerminal);
     }
   };
 

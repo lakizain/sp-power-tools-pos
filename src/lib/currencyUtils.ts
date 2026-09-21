@@ -55,11 +55,42 @@ export interface CurrencyConversion {
 const cachedRates: Map<string, { rate: number; timestamp: number }> = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+const fallbackCurrencies: CurrencyConfig[] = [
+    { id: 'lkr', code: 'LKR', name: 'Sri Lankan Rupee', symbol: 'Rs', symbolPosition: 'before', decimalPlaces: 2, isActive: true, isBaseCurrency: true, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'usd', code: 'USD', name: 'US Dollar', symbol: '$', symbolPosition: 'before', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'eur', code: 'EUR', name: 'Euro', symbol: '€', symbolPosition: 'after', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'gbp', code: 'GBP', name: 'British Pound', symbol: '£', symbolPosition: 'before', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'cad', code: 'CAD', name: 'Canadian Dollar', symbol: 'C$', symbolPosition: 'before', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'jpy', code: 'JPY', name: 'Japanese Yen', symbol: '¥', symbolPosition: 'before', decimalPlaces: 0, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'aud', code: 'AUD', name: 'Australian Dollar', symbol: 'A$', symbolPosition: 'before', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'chf', code: 'CHF', name: 'Swiss Franc', symbol: 'CHF', symbolPosition: 'after', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'cny', code: 'CNY', name: 'Chinese Yuan', symbol: '¥', symbolPosition: 'before', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+    { id: 'inr', code: 'INR', name: 'Indian Rupee', symbol: '₹', symbolPosition: 'before', decimalPlaces: 2, isActive: true, isBaseCurrency: false, createdAt: new Date(), updatedAt: new Date() },
+];
+
 // Currency utilities class
 export class CurrencyUtils {
+    private static async hasActiveSession(): Promise<boolean> {
+        try {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) {
+                console.warn('Currency utility skipped because no active Supabase session is available:', error.message);
+                return false;
+            }
+            return !!session;
+        } catch (error) {
+            console.warn('Currency utility session check failed:', error);
+            return false;
+        }
+    }
 
     // Get all supported currencies
     static async getSupportedCurrencies(): Promise<CurrencyConfig[]> {
+        const hasSession = await this.hasActiveSession();
+        if (!hasSession) {
+            return fallbackCurrencies;
+        }
+
         const { data, error } = await supabase
             .from('currency_config')
             .select('*')
@@ -84,6 +115,22 @@ export class CurrencyUtils {
 
     // Get base currency
     static async getBaseCurrency(): Promise<CurrencyConfig> {
+        const hasSession = await this.hasActiveSession();
+        if (!hasSession) {
+            return {
+                id: 'lkr',
+                code: 'LKR',
+                name: 'Sri Lankan Rupee',
+                symbol: 'Rs',
+                symbolPosition: 'before',
+                decimalPlaces: 2,
+                isActive: true,
+                isBaseCurrency: true,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+        }
+
         const { data, error } = await supabase
             .from('currency_config')
             .select('*')
@@ -195,6 +242,11 @@ export class CurrencyUtils {
         source: 'api' | 'manual' | 'fallback' = 'api',
         isManualOverride: boolean = false
     ): Promise<void> {
+        const hasSession = await this.hasActiveSession();
+        if (!hasSession) {
+            return;
+        }
+
         try {
             const { error } = await supabase.rpc('update_exchange_rate', {
                 p_base_currency: baseCurrency,
@@ -246,6 +298,11 @@ export class CurrencyUtils {
 
     // Get all current exchange rates
     static async getAllCurrentRates(baseCurrency: string): Promise<ExchangeRate[]> {
+        const hasSession = await this.hasActiveSession();
+        if (!hasSession) {
+            return [];
+        }
+
         const { data, error } = await supabase
             .from('exchange_rates')
             .select('*')

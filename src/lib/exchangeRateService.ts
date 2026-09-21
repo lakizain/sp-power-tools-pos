@@ -2,11 +2,14 @@ import { CurrencyUtils, updateExchangeRate } from './currencyUtils';
 
 // Exchange rate API response interfaces
 interface ExchangeRateAPIResponse {
-    success: boolean;
-    timestamp: number;
-    base: string;
-    date: string;
-    rates: Record<string, number>;
+    success?: boolean;
+    timestamp?: number;
+    base?: string;
+    date?: string;
+    rates?: Record<string, number>;
+    result?: string;
+    conversion_rates?: Record<string, number>;
+    [key: string]: unknown;
 }
 
 interface FixerIOResponse {
@@ -235,12 +238,13 @@ export class ExchangeRateService {
         }
 
         const data: ExchangeRateAPIResponse = await response.json();
+        const rates = data.rates ?? data.conversion_rates ?? {};
 
-        if (!data.success) {
+        if (!rates || typeof rates !== 'object' || Object.keys(rates).length === 0) {
             throw new Error('ExchangeRate API error: Invalid response');
         }
 
-        return data.rates;
+        return rates as Record<string, number>;
     }
 
     // Update rates in database
