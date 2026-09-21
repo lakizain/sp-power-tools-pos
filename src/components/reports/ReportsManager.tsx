@@ -1,22 +1,32 @@
 import { useState, useMemo } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { DollarSign, ShoppingCart, Users, TrendingUp, Download, BarChart3, Wallet, PiggyBank, TrendingDown, Receipt } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { useApp } from '../../context/SupabaseAppContext';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, differenceInCalendarDays } from 'date-fns';
 
 export function ReportsManager() {
   const { state } = useApp();
   const [dateRange, setDateRange] = useState('7');
-  const [reportType, setReportType] = useState('sales');
+  const [reportType, setReportType] = useState('summary');
   const [startDateInput, setStartDateInput] = useState('');
   const [endDateInput, setEndDateInput] = useState('');
 
-  const endDate = (dateRange === 'custom' && endDateInput && endDateInput.trim() !== '') ? new Date(endDateInput) : new Date();
-  const startDate = (dateRange === 'custom' && startDateInput && startDateInput.trim() !== '') ? new Date(startDateInput) : subDays(endDate, parseInt(dateRange) || 7);
+  const thisMonthStart = startOfMonth(new Date());
+  const thisMonthEnd = endOfMonth(new Date());
+  const endDate = (dateRange === 'custom' && endDateInput && endDateInput.trim() !== '') ? new Date(endDateInput) :
+    (dateRange === 'month' ? thisMonthEnd : new Date());
+  const startDate = (dateRange === 'custom' && startDateInput && startDateInput.trim() !== '') ? new Date(startDateInput) :
+    (dateRange === 'month' ? thisMonthStart : (dateRange === '1' ? startOfDay(new Date()) : subDays(endDate, parseInt(dateRange) || 7)));
 
   // Validate dates
   const validEndDate = isNaN(endDate.getTime()) ? new Date() : endDate;
   const validStartDate = isNaN(startDate.getTime()) ? subDays(validEndDate, 7) : startDate;
+  const visibleDayCount = dateRange === 'custom'
+    ? Math.max(1, differenceInCalendarDays(validEndDate, validStartDate) + 1)
+    : dateRange === 'month'
+      ? Math.max(1, differenceInCalendarDays(thisMonthEnd, thisMonthStart) + 1)
+      : Math.max(1, parseInt(dateRange) || 7);
 
   const filteredSales = state.sales.filter(sale => {
     const saleDate = new Date(sale.timestamp);
@@ -26,8 +36,8 @@ export function ReportsManager() {
   // Sales Analytics
   const salesData = useMemo(() => {
     const salesByDay: Record<string, { date: string; sales: number; transactions: number }> = {};
-    const days = parseInt(dateRange);
-    
+    const days = Math.max(1, visibleDayCount);
+
     for (let i = days - 1; i >= 0; i--) {
       const date = format(subDays(validEndDate, i), 'MM/dd');
       salesByDay[date] = { date, sales: 0, transactions: 0 };
@@ -42,7 +52,7 @@ export function ReportsManager() {
     });
 
     return Object.values(salesByDay);
-  }, [filteredSales, dateRange, validEndDate]);
+  }, [filteredSales, validEndDate, visibleDayCount]);
 
   // Top Products
   const topProducts = useMemo(() => {
@@ -306,14 +316,10 @@ export function ReportsManager() {
 
   // Daily Profit Trend
   const dailyProfitData = useMemo(() => {
-    const days = parseInt(dateRange);
+    const days = Math.max(1, visibleDayCount);
     const profitByDay: Record<string, { date: string; revenue: number; cogs: number; grossProfit: number; expenses: number; netProfit: number }> = {};
-    
-    const daysToUse = dateRange === 'custom' 
-      ? Math.max(1, Math.ceil((validEndDate.getTime() - validStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)
-      : (isNaN(days) ? 7 : days);
 
-    for (let i = daysToUse - 1; i >= 0; i--) {
+    for (let i = days - 1; i >= 0; i--) {
       const date = format(subDays(validEndDate, i), 'MM/dd');
       profitByDay[date] = { date, revenue: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0 };
     }
@@ -345,70 +351,103 @@ export function ReportsManager() {
     });
 
     return Object.values(profitByDay);
-  }, [filteredSales, filteredExpenses, dateRange, validEndDate, validStartDate]);
+  }, [filteredSales, filteredExpenses, validEndDate, visibleDayCount]);
 
   const COLORS = ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#EC4899'];
 
   const exportReport = () => {
-    let csvHeader = '';
-    let csvData = '';
-    let fileName = '';
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const summaryRows = dailyProfitData.map(day => ({
+      date: day.date,
+      revenue: day.revenue,
+      expenses: day.expenses,
+      netProfit: day.netProfit,
+    }));
 
-    if (reportType === 'sales') {
-      csvHeader = 'Date,Invoice Number,Customer,Items,Total,Discount,Payments,Cashier\n';
-      csvData = filteredSales.map(sale => {
-        const customerName = sale.customerId ? state.customers.find(c => c.id === sale.customerId)?.name || 'Walk-in Customer' : 'Walk-in Customer';
-        const itemCount = sale.items.length;
-        // Build payments string - prefer payments breakdown if available
-        let paymentsStr = '';
-        if (sale.payments && sale.payments.length > 0) {
-          paymentsStr = sale.payments.map(p => `${p.method}:${p.amount.toFixed(2)}`).join(';');
-        } else {
-          paymentsStr = `${sale.paymentMethod}:${sale.total.toFixed(2)}`;
-        }
-        // Escape commas in customer name
-        const safeCustomer = customerName.replace(/,/g, ' ');
-        return `${format(new Date(sale.timestamp), 'yyyy-MM-dd HH:mm:ss')},${sale.invoiceNumber},${safeCustomer},${itemCount},${sale.total.toFixed(2)},${sale.discountAmount.toFixed(2)},"${paymentsStr}",${sale.cashier}`;
-      }).join('\n');
-      fileName = `pos-sales-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else if (reportType === 'customers') {
-      csvHeader = 'Customer Name,Total Spent,Total Transactions,Total Items,Avg Transaction Value,Last Purchase\n';
-      csvData = customerData.map(customer => {
-        return `${customer.name},${customer.totalSpent.toFixed(2)},${customer.totalTransactions},${customer.totalItems},${customer.avgTransactionValue.toFixed(2)},${format(customer.lastPurchase, 'yyyy-MM-dd HH:mm:ss')}`;
-      }).join('\n');
-      fileName = `pos-customers-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else if (reportType === 'inventory') {
-      csvHeader = 'Product Name,SKU,Category,Current Stock,Min Stock,Stock Status,Cost Price,Selling Price,Stock Value,Potential Revenue,Sold Quantity,Revenue,Turnover Ratio,Profit Margin %,Active\n';
-      csvData = inventoryData.map(item => {
-        return `${item.name},${item.sku},${item.category},${item.currentStock},${item.minStock},${item.stockStatus},${item.costPrice.toFixed(2)},${item.sellingPrice.toFixed(2)},${item.stockValue.toFixed(2)},${item.potentialRevenue.toFixed(2)},${item.soldQuantity},${item.revenue.toFixed(2)},${item.turnoverRatio.toFixed(2)},${item.profitMargin.toFixed(2)},${item.active ? 'Yes' : 'No'}`;
-      }).join('\n');
-      fileName = `pos-inventory-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    } else if (reportType === 'profit') {
-      csvHeader = 'Product,Category,Quantity Sold,Revenue,COGS,Gross Profit,Margin %\n';
-      csvData = profitData.productProfit.map(item => {
-        return `${item.name.replace(/,/g, ' ')},${item.category.replace(/,/g, ' ')},${item.quantitySold},${item.revenue.toFixed(2)},${item.cogs.toFixed(2)},${item.grossProfit.toFixed(2)},${item.margin.toFixed(2)}`;
-      }).join('\n');
-      
-      // Add summary section
-      csvData += '\n\n=== PROFIT SUMMARY ===\n';
-      csvData += `Total Revenue,${profitData.totalRevenue.toFixed(2)}\n`;
-      csvData += `Total COGS,${profitData.totalCOGS.toFixed(2)}\n`;
-      csvData += `Gross Profit,${profitData.totalGrossProfit.toFixed(2)}\n`;
-      csvData += `Gross Profit Margin %,${profitData.grossProfitMargin.toFixed(2)}\n`;
-      csvData += `Total Expenses,${profitData.totalExpenses.toFixed(2)}\n`;
-      csvData += `Net Profit,${profitData.netProfit.toFixed(2)}\n`;
-      csvData += `Net Profit Margin %,${profitData.netProfitMargin.toFixed(2)}\n`;
-      
-      fileName = `pos-profit-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    const currency = state.settings.currency || 'LKR';
+    const reportTitle = reportType === 'summary' ? 'Financial Summary Report' : `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report`;
+    const periodText = `${format(validStartDate, 'MMM dd, yyyy')} - ${format(validEndDate, 'MMM dd, yyyy')}`;
+
+    doc.setFontSize(18);
+    doc.text('S&P Power Tools', 14, 18);
+    doc.setFontSize(13);
+    doc.text(reportTitle, 14, 28);
+    doc.setFontSize(10);
+    doc.text(`Period: ${periodText}`, 14, 36);
+
+    const totals = [
+      ['Revenue', `${currency} ${profitData.totalRevenue.toFixed(2)}`],
+      ['Gross Profit', `${currency} ${profitData.totalGrossProfit.toFixed(2)}`],
+      ['Expenses', `${currency} ${profitData.totalExpenses.toFixed(2)}`],
+      ['Net Profit', `${currency} ${profitData.netProfit.toFixed(2)}`],
+      ['Transactions', `${totalTransactions}`],
+      ['Avg. Transaction', `${currency} ${averageTransaction.toFixed(2)}`],
+    ];
+
+    let y = 48;
+    doc.setFontSize(11);
+    doc.setTextColor(40, 40, 40);
+    totals.forEach(([label, value]) => {
+      doc.text(`${label}: ${value}`, 14, y);
+      y += 8;
+    });
+
+    const tableRows = summaryRows.slice(0, 12).map(row => [
+      row.date,
+      `${currency} ${row.revenue.toFixed(2)}`,
+      `${currency} ${row.expenses.toFixed(2)}`,
+      `${currency} ${row.netProfit.toFixed(2)}`,
+    ]);
+
+    y += 6;
+    doc.setFontSize(11);
+    doc.text('Daily Details', 14, y);
+    y += 8;
+
+    if (y > 250) {
+      doc.addPage();
+      y = 18;
     }
-    
-    const fullCsv = csvHeader + csvData;
-    const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(fullCsv);
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', fileName);
-    linkElement.click();
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setFillColor(245, 245, 245);
+    doc.rect(14, y, 180, 10, 'F');
+    doc.text('Date', 18, y + 7);
+    doc.text('Revenue', 72, y + 7);
+    doc.text('Expenses', 120, y + 7);
+    doc.text('Net', 165, y + 7);
+    y += 12;
+
+    tableRows.forEach(([date, revenue, expenses, net]) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 18;
+      }
+      doc.text(date, 18, y + 6);
+      doc.text(revenue, 72, y + 6);
+      doc.text(expenses, 120, y + 6);
+      doc.text(net, 165, y + 6);
+      y += 8;
+    });
+
+    if (reportType === 'profit' || reportType === 'summary') {
+      doc.addPage();
+      doc.setFontSize(13);
+      doc.text('Profit Breakdown', 14, 18);
+      doc.setFontSize(10);
+      profitData.productProfit.slice(0, 15).forEach((item, index) => {
+        const lineY = 30 + index * 8;
+        if (lineY > 270) {
+          doc.addPage();
+          return;
+        }
+        doc.text(`${index + 1}. ${item.name} - ${currency} ${item.grossProfit.toFixed(2)} (${item.margin.toFixed(1)}%)`, 14, lineY);
+      });
+    }
+
+    const fileName = `sp-power-tools-${reportType}-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+    doc.save(fileName);
   };
 
   return (
@@ -427,7 +466,7 @@ export function ReportsManager() {
           className="btn btn-primary btn-lg"
         >
           <Download className="h-5 w-5" />
-          <span>Export Report</span>
+          <span>Download PDF</span>
         </button>
       </div>
 
@@ -443,8 +482,9 @@ export function ReportsManager() {
             <select
               value={reportType}
               onChange={(e) => setReportType(e.target.value)}
-              className="select min-w-[150px]"
+              className="select min-w-[180px]"
             >
+              <option value="summary">Financial Summary</option>
               <option value="sales">Sales Report</option>
               <option value="profit">Profit Report</option>
               <option value="inventory">Inventory Report</option>
@@ -464,12 +504,12 @@ export function ReportsManager() {
                   setStartDateInput(format(weekAgo, 'yyyy-MM-dd'));
                 }
               }}
-              className="select min-w-[150px]"
+              className="select min-w-[180px]"
             >
               <option value="1">Today</option>
               <option value="7">Last 7 Days</option>
               <option value="30">Last 30 Days</option>
-              <option value="90">Last 90 Days</option>
+              <option value="month">This Month</option>
               <option value="custom">Custom Range</option>
             </select>
             
@@ -495,6 +535,146 @@ export function ReportsManager() {
           </div>
         </div>
       </div>
+
+      {reportType === 'summary' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <div className="stat-card bg-gradient-to-br from-green-500 to-green-600">
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-green-100 text-sm font-medium">Revenue</p>
+                  <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalRevenue.toFixed(2)}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-2xl">
+                  <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card bg-gradient-to-br from-emerald-500 to-emerald-600">
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-emerald-100 text-sm font-medium">Gross Profit</p>
+                  <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalGrossProfit.toFixed(2)}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-2xl">
+                  <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card bg-gradient-to-br from-rose-500 to-rose-600">
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-rose-100 text-sm font-medium">Expenses</p>
+                  <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalExpenses.toFixed(2)}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-2xl">
+                  <Receipt className="h-6 w-6 lg:h-8 lg:w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card bg-gradient-to-br from-indigo-500 to-indigo-600">
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-indigo-100 text-sm font-medium">Net Profit</p>
+                  <p className={`text-xl lg:text-2xl font-bold ${profitData.netProfit < 0 ? 'text-red-200' : ''}`}>
+                    {state.settings.currency} {profitData.netProfit.toFixed(2)}
+                  </p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-2xl">
+                  <PiggyBank className="h-6 w-6 lg:h-8 lg:w-8" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="card p-6 xl:col-span-2">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2 text-emerald-600" />
+                Revenue vs Profit Trend
+              </h3>
+              <ResponsiveContainer width="100%" height={320}>
+                <LineChart data={dailyProfitData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" stroke="#6b7280" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={12} />
+                  <Tooltip
+                    formatter={(value: any, name: string) => {
+                      const labels: Record<string, string> = {
+                        revenue: 'Revenue',
+                        grossProfit: 'Gross Profit',
+                        expenses: 'Expenses',
+                        netProfit: 'Net Profit',
+                      };
+                      return [`${state.settings.currency} ${Number(value).toFixed(2)}`, labels[name] || name];
+                    }}
+                    contentStyle={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                  />
+                  <Legend />
+                  <Line type="monotone" dataKey="revenue" stroke="#2563EB" strokeWidth={2.5} name="Revenue" dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="grossProfit" stroke="#059669" strokeWidth={2.5} name="Gross Profit" dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="expenses" stroke="#DC2626" strokeWidth={2} name="Expenses" dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="netProfit" stroke="#7C3AED" strokeWidth={3} name="Net Profit" dot={{ r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="card p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+                <Receipt className="h-5 w-5 mr-2 text-rose-600" />
+                Expense Breakdown
+              </h3>
+              <div className="space-y-3">
+                {profitData.expenseByCategory.length > 0 ? profitData.expenseByCategory.map((item, index) => (
+                  <div key={item.name} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></span>
+                      <span>{item.name}</span>
+                    </div>
+                    <span className="font-semibold">{state.settings.currency} {item.value.toFixed(2)}</span>
+                  </div>
+                )) : <p className="text-gray-500">No expenses recorded in this period.</p>}
+              </div>
+            </div>
+          </div>
+
+          <div className="card overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                <BarChart3 className="h-5 w-5 mr-2 text-indigo-600" />
+                Summary by Date
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead className="table-header">
+                  <tr>
+                    <th className="table-header-cell">Date</th>
+                    <th className="table-header-cell">Revenue</th>
+                    <th className="table-header-cell">Expenses</th>
+                    <th className="table-header-cell">Net Profit</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {dailyProfitData.map((day) => (
+                    <tr key={day.date} className="table-row">
+                      <td className="table-cell font-semibold text-gray-900">{day.date}</td>
+                      <td className="table-cell text-blue-600 font-semibold">{state.settings.currency} {day.revenue.toFixed(2)}</td>
+                      <td className="table-cell text-red-600 font-semibold">{state.settings.currency} {day.expenses.toFixed(2)}</td>
+                      <td className={`table-cell font-semibold ${day.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {state.settings.currency} {day.netProfit.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       {reportType === 'sales' && (

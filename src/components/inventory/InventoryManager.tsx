@@ -227,16 +227,16 @@ export function InventoryManager() {
   };
 
   const printColumns: PrintColumn<Product>[] = [
-    { key: 'sku', header: 'SKU', accessor: (p) => p.sku, width: '10%', align: 'left' },
-    { key: 'name', header: 'Product Name', accessor: (p) => p.name, width: '22%' },
-    { key: 'category', header: 'Category', accessor: (p) => p.category, width: '12%' },
-    { key: 'price', header: 'Price', accessor: (p) => `${state.settings.currency} ${p.price.toFixed(2)}`, width: '9%', align: 'right' },
-    { key: 'cost', header: 'Cost', accessor: (p) => `${state.settings.currency} ${p.cost.toFixed(2)}`, width: '9%', align: 'right' },
-    { key: 'stock', header: 'Stock', accessor: (p) => p.stock, width: '7%', align: 'right' },
-    { key: 'minStock', header: 'Min', accessor: (p) => p.minStock, width: '6%', align: 'right' },
-    { key: 'value', header: 'Stock Value', accessor: (p) => `${state.settings.currency} ${(p.stock * p.cost).toFixed(2)}`, width: '11%', align: 'right' },
-    { key: 'barcode', header: 'Barcode', accessor: (p) => p.barcode || '-', width: '10%' },
-    { key: 'created', header: 'Created', accessor: (p) => format(new Date(p.createdAt), 'yyyy-MM-dd'), width: '4%' },
+    { key: 'sku', header: 'SKU', accessor: (p) => p.sku, width: '11%', align: 'left' },
+    { key: 'name', header: 'Product Name', accessor: (p) => p.name, width: '25%' },
+    { key: 'category', header: 'Category', accessor: (p) => p.category, width: '13%' },
+    { key: 'price', header: 'Price', accessor: (p) => `${state.settings.currency} ${p.price.toFixed(2)}`, width: '10%', align: 'right' },
+    { key: 'cost', header: 'Cost', accessor: (p) => `${state.settings.currency} ${p.cost.toFixed(2)}`, width: '10%', align: 'right' },
+    { key: 'stock', header: 'Stock', accessor: (p) => p.stock, width: '8%', align: 'right' },
+    { key: 'minStock', header: 'Min', accessor: (p) => p.minStock, width: '7%', align: 'right' },
+    { key: 'value', header: 'Stock Value', accessor: (p) => `${state.settings.currency} ${(p.stock * p.cost).toFixed(2)}`, width: '12%', align: 'right' },
+    { key: 'barcode', header: 'Barcode', accessor: (p) => p.barcode || '-', width: '11%' },
+    { key: 'created', header: 'Created', accessor: (p) => format(new Date(p.createdAt), 'yyyy-MM-dd'), width: '3%' },
   ];
 
   const filterStats = useMemo(() => {
@@ -759,7 +759,7 @@ export function InventoryManager() {
         data={filteredProducts}
         summaries={printSummaries}
         filters={printFilters}
-        orientation="landscape"
+        orientation="portrait"
       />
     </div>
   );

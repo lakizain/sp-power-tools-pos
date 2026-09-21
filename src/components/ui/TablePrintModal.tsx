@@ -45,14 +45,18 @@ const A4_CONFIG = {
   pageHeightMm: 210,
   portraitWidthMm: 210,
   portraitHeightMm: 297,
-  marginXMm: 8,
-  marginYMm: 8,
-  headerHeightMm: 24,
-  summaryHeightMm: 18,
-  footerHeightMm: 9,
-  tableHeaderHeightMm: 6.5,
-  tableRowHeightMm: 5.8,
+  marginXMm: 10,
+  marginYMm: 10,
+  firstPageHeaderMm: 24,
+  tableHeaderHeightMm: 5,
+  tableRowHeightMm: 3.85,
+  summaryFooterMm: 6,
 };
+
+const PRINT_FONT = 'Arial, Helvetica, sans-serif';
+const CELL_BORDER = '0.15mm solid #000000';
+const HEADER_RULE = '0.55mm solid #000000';
+const ROW_STRIPE = '#f2f2f2';
 
 export function TablePrintModal<T>({
   isOpen,
@@ -73,22 +77,57 @@ export function TablePrintModal<T>({
   const pageH = isLandscape ? A4_CONFIG.pageHeightMm : A4_CONFIG.portraitHeightMm;
   const contentW = pageW - A4_CONFIG.marginXMm * 2;
 
-  const rowsPerPage = useMemo(() => {
+  const rowsPerPageFirst = useMemo(() => {
     const used =
-      A4_CONFIG.headerHeightMm +
-      (summaries && summaries.length > 0 ? A4_CONFIG.summaryHeightMm : 0) +
+      A4_CONFIG.marginYMm * 2 +
+      A4_CONFIG.firstPageHeaderMm +
+      (filters && filters.length > 0 ? 3 : 0) +
       A4_CONFIG.tableHeaderHeightMm +
-      A4_CONFIG.footerHeightMm +
-      A4_CONFIG.marginYMm * 2;
-    const remaining = pageH - used - 6;
-    return Math.max(5, Math.floor(remaining / A4_CONFIG.tableRowHeightMm));
-  }, [pageH, summaries]);
+      1;
+    const remaining = pageH - used;
+    return Math.max(8, Math.floor(remaining / A4_CONFIG.tableRowHeightMm));
+  }, [pageH, filters]);
 
-  const totalPages = Math.max(1, Math.ceil(data.length / rowsPerPage));
+  const rowsPerPageRest = useMemo(() => {
+    const used =
+      A4_CONFIG.marginYMm * 2 +
+      A4_CONFIG.tableHeaderHeightMm +
+      1;
+    const remaining = pageH - used;
+    return Math.max(12, Math.floor(remaining / A4_CONFIG.tableRowHeightMm));
+  }, [pageH]);
+
+  const pageSlices = useMemo(() => {
+    if (data.length === 0) {
+      return [{ start: 0, end: 0, isFirst: true, isLast: true }];
+    }
+    const slices: { start: number; end: number; isFirst: boolean; isLast: boolean }[] = [];
+    let idx = 0;
+    let first = true;
+    while (idx < data.length) {
+      const limit = first ? rowsPerPageFirst : rowsPerPageRest;
+      const end = Math.min(idx + limit, data.length);
+      slices.push({ start: idx, end, isFirst: first, isLast: false });
+      idx = end;
+      first = false;
+    }
+    if (slices.length > 0) {
+      slices[slices.length - 1].isLast = true;
+    }
+    return slices;
+  }, [data.length, rowsPerPageFirst, rowsPerPageRest]);
+
+  const totalPages = pageSlices.length;
 
   const storeName = state.settings.storeName || 'Business Report';
-  const currency = state.settings.currency || 'LKR';
-  const generatedAt = format(new Date(), 'yyyy-MM-dd HH:mm');
+  const generatedAt = format(new Date(), 'M/d/yyyy, h:mm:ss a');
+
+  const reportDateLabel = useMemo(() => {
+    const dateFilter = filters?.find((f) => /date/i.test(f.label));
+    if (dateFilter?.value) return dateFilter.value;
+    if (subtitle) return subtitle;
+    return format(new Date(), 'd MMMM yyyy');
+  }, [filters, subtitle]);
 
   const handlePrint = () => {
     setTimeout(() => {
@@ -133,13 +172,71 @@ export function TablePrintModal<T>({
 
   if (!isOpen) return null;
 
+  const renderReportHeader = (showFull: boolean) => {
+    if (!showFull) return null;
+    return (
+      <div
+        style={{
+          textAlign: 'center',
+          fontFamily: PRINT_FONT,
+          color: '#000000',
+          marginBottom: mm(2),
+        }}
+      >
+        <div
+          style={{
+            fontSize: '17pt',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            lineHeight: 1.15,
+            letterSpacing: '0.02em',
+          }}
+        >
+          {storeName}
+        </div>
+        <div
+          style={{
+            fontSize: '13pt',
+            fontWeight: 700,
+            marginTop: mm(1.2),
+            lineHeight: 1.2,
+          }}
+        >
+          {title}
+        </div>
+        <div style={{ fontSize: '10pt', marginTop: mm(1), lineHeight: 1.25 }}>
+          Date: {reportDateLabel}
+        </div>
+        <div style={{ fontSize: '8pt', marginTop: mm(0.6), lineHeight: 1.25 }}>
+          Generated on: {generatedAt}
+        </div>
+        {filters && filters.length > 0 && (
+          <div
+            style={{
+              fontSize: '8pt',
+              marginTop: mm(1.2),
+              lineHeight: 1.35,
+              color: '#000000',
+            }}
+          >
+            {filters
+              .filter((f) => !/date/i.test(f.label))
+              .map((f, i) => (
+                <div key={i}>
+                  {f.label}: {f.value}
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderPages = () => {
     const pages: JSX.Element[] = [];
 
-    for (let p = 0; p < totalPages; p++) {
-      const startIdx = p * rowsPerPage;
-      const endIdx = Math.min(startIdx + rowsPerPage, data.length);
-      const pageData = data.slice(startIdx, endIdx);
+    pageSlices.forEach((slice, p) => {
+      const pageData = data.slice(slice.start, slice.end);
 
       pages.push(
         <div
@@ -154,250 +251,174 @@ export function TablePrintModal<T>({
             background: '#ffffff',
             boxSizing: 'border-box',
             margin: 0,
-            padding: 0,
+            padding: `${mm(A4_CONFIG.marginYMm)} ${mm(A4_CONFIG.marginXMm)}`,
+            fontFamily: PRINT_FONT,
           }}
         >
-          <div
+          {renderReportHeader(slice.isFirst)}
+
+          <table
             style={{
-              position: 'absolute',
-              left: mm(A4_CONFIG.marginXMm),
-              top: mm(A4_CONFIG.marginYMm),
-              right: mm(A4_CONFIG.marginXMm),
+              width: '100%',
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              fontFamily: PRINT_FONT,
+              fontSize: '8pt',
+              color: '#000000',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                paddingBottom: mm(2),
-                borderBottom: '0.2mm solid #1f2937',
-                marginBottom: mm(1.5),
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    fontSize: '13pt',
-                    fontWeight: 800,
-                    color: '#111827',
-                    letterSpacing: '-0.01em',
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {storeName}
-                </div>
-                <div
-                  style={{
-                    fontSize: '9pt',
-                    fontWeight: 700,
-                    color: '#1f2937',
-                    marginTop: mm(0.8),
-                  }}
-                >
-                  {title}
-                </div>
-                {subtitle && (
-                  <div
-                    style={{
-                      fontSize: '7.5pt',
-                      color: '#6b7280',
-                      marginTop: mm(0.3),
-                    }}
-                  >
-                    {subtitle}
-                  </div>
-                )}
-              </div>
-              <div style={{ textAlign: 'right', fontSize: '6.8pt', color: '#4b5563' }}>
-                <div style={{ fontWeight: 600 }}>Generated</div>
-                <div style={{ fontFamily: 'monospace' }}>{generatedAt}</div>
-                <div style={{ marginTop: mm(0.8), fontWeight: 600 }}>Page</div>
-                <div style={{ fontFamily: 'monospace' }}>{p + 1} / {totalPages}</div>
-              </div>
-            </div>
-
-            {filters && filters.length > 0 && p === 0 && (
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: mm(1.5),
-                  padding: mm(1.2),
-                  background: '#f9fafb',
-                  borderRadius: mm(0.8),
-                  marginBottom: mm(1.2),
-                  fontSize: '7.2pt',
-                }}
-              >
-                {filters.map((f, i) => (
-                  <div key={i}>
-                    <span style={{ color: '#6b7280', fontWeight: 600 }}>{f.label}: </span>
-                    <span style={{ color: '#111827', fontWeight: 700 }}>{f.value}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {summaries && summaries.length > 0 && p === 0 && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${Math.min(summaries.length, 4)}, 1fr)`,
-                  gap: mm(1.5),
-                  marginBottom: mm(1.5),
-                }}
-              >
-                {summaries.map((s, i) => (
-                  <div
+            <thead>
+              <tr>
+                {columns.map((col, i) => (
+                  <th
                     key={i}
                     style={{
-                      background: s.highlight ? '#fef3c7' : '#f3f4f6',
-                      borderLeft: s.highlight ? '0.7mm solid #f59e0b' : '0.4mm solid #d1d5db',
-                      padding: mm(1.3),
-                      borderRadius: mm(0.8),
+                      fontWeight: 700,
+                      textAlign: col.align || 'left',
+                      padding: `${mm(0.9)} ${mm(1.2)}`,
+                      fontSize: '8pt',
+                      textTransform: 'uppercase',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      width: col.width || 'auto',
+                      border: CELL_BORDER,
+                      borderTop: HEADER_RULE,
+                      borderBottom: HEADER_RULE,
+                      verticalAlign: 'middle',
+                      lineHeight: 1.15,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: '6.5pt',
-                        color: '#6b7280',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.03em',
-                      }}
-                    >
-                      {s.label}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '10pt',
-                        fontWeight: 800,
-                        color: s.highlight ? '#92400e' : '#111827',
-                        marginTop: mm(0.4),
-                      }}
-                    >
-                      {s.value}
-                    </div>
-                  </div>
+                    {col.header}
+                  </th>
                 ))}
-              </div>
-            )}
-
-            <div style={{ overflow: 'hidden' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '7.5pt',
-                  tableLayout: 'fixed',
-                }}
-              >
-                <thead>
-                  <tr style={{ background: '#1f2937' }}>
-                    {columns.map((col, i) => (
-                      <th
-                        key={i}
-                        style={{
-                          color: '#ffffff',
-                          fontWeight: 700,
-                          textAlign: col.align || 'left',
-                          padding: `${mm(0.9)} ${mm(1.2)}`,
-                          fontSize: '6.8pt',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.025em',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          width: col.width || 'auto',
-                          borderRight: i < columns.length - 1 ? '0.08mm solid #374151' : 'none',
-                        }}
-                      >
-                        {col.header}
-                      </th>
-                    ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pageData.length === 0 && slice.isFirst ? (
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    style={{
+                      textAlign: 'center',
+                      padding: mm(6),
+                      fontSize: '9pt',
+                      fontStyle: 'italic',
+                      border: CELL_BORDER,
+                    }}
+                  >
+                    {emptyMessage}
+                  </td>
+                </tr>
+              ) : (
+                pageData.map((row, ri) => (
+                  <tr
+                    key={ri}
+                    style={{
+                      background: ri % 2 === 0 ? '#ffffff' : ROW_STRIPE,
+                    }}
+                  >
+                    {columns.map((col, ci) => {
+                      const val = col.accessor(row);
+                      const align = col.align || 'left';
+                      return (
+                        <td
+                          key={ci}
+                          style={{
+                            textAlign: align,
+                            padding: `${mm(0.65)} ${mm(1.2)}`,
+                            verticalAlign: 'middle',
+                            border: CELL_BORDER,
+                            wordBreak: 'break-word',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            fontSize: '8pt',
+                            lineHeight: 1.15,
+                            fontVariantNumeric: align === 'right' ? 'tabular-nums' : 'normal',
+                            textTransform:
+                              align === 'right' || align === 'center' ? 'none' : 'uppercase',
+                          }}
+                        >
+                          {typeof val === 'string' || typeof val === 'number' ? val : val}
+                        </td>
+                      );
+                    })}
                   </tr>
-                </thead>
-                <tbody>
-                  {pageData.length === 0 ? (
-                    <tr>
+                ))
+              )}
+            </tbody>
+            {slice.isLast && summaries && summaries.length > 0 && (
+              <tfoot>
+                {summaries.map((s, si) => (
+                  <tr key={si}>
+                    {columns.length > 1 ? (
+                      <>
+                        <td
+                          colSpan={columns.length - 1}
+                          style={{
+                            border: 'none',
+                            borderTop: si === 0 ? HEADER_RULE : 'none',
+                            padding: `${mm(1)} ${mm(1.2)}`,
+                            textAlign: 'right',
+                            fontWeight: 700,
+                            fontSize: '9pt',
+                            background: '#ffffff',
+                          }}
+                        >
+                          {s.label}:
+                        </td>
+                        <td
+                          style={{
+                            border: 'none',
+                            borderTop: si === 0 ? HEADER_RULE : 'none',
+                            padding: `${mm(1)} ${mm(1.2)}`,
+                            textAlign: 'right',
+                            fontWeight: 700,
+                            fontSize: '9pt',
+                            fontVariantNumeric: 'tabular-nums',
+                            background: '#ffffff',
+                          }}
+                        >
+                          {s.value}
+                        </td>
+                      </>
+                    ) : (
                       <td
-                        colSpan={columns.length}
+                        colSpan={1}
                         style={{
-                          textAlign: 'center',
-                          padding: mm(8),
-                          color: '#9ca3af',
+                          border: 'none',
+                          borderTop: si === 0 ? HEADER_RULE : 'none',
+                          padding: `${mm(1)} ${mm(1.2)}`,
+                          textAlign: 'right',
+                          fontWeight: 700,
                           fontSize: '9pt',
-                          fontStyle: 'italic',
+                          background: '#ffffff',
                         }}
                       >
-                        {emptyMessage}
+                        {s.label}: {s.value}
                       </td>
-                    </tr>
-                  ) : (
-                    pageData.map((row, ri) => (
-                      <tr
-                        key={ri}
-                        style={{
-                          background: ri % 2 === 0 ? '#ffffff' : '#f9fafb',
-                          borderBottom: '0.08mm solid #e5e7eb',
-                        }}
-                      >
-                        {columns.map((col, ci) => {
-                          const val = col.accessor(row);
-                          return (
-                            <td
-                              key={ci}
-                              style={{
-                                textAlign: col.align || 'left',
-                                padding: `${mm(0.6)} ${mm(1.2)}`,
-                                color: '#1f2937',
-                                verticalAlign: 'middle',
-                                borderRight: ci < columns.length - 1 ? '0.04mm solid #f3f4f6' : 'none',
-                                wordBreak: 'break-word',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                fontSize: '7.4pt',
-                                lineHeight: 1.12,
-                              }}
-                            >
-                              {typeof val === 'string' || typeof val === 'number' ? val : val}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    )}
+                  </tr>
+                ))}
+              </tfoot>
+            )}
+          </table>
 
+          {totalPages > 1 && (
             <div
               style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                paddingTop: mm(1.2),
-                borderTop: '0.15mm solid #d1d5db',
-                display: 'flex',
-                justifyContent: 'space-between',
-                fontSize: '6.3pt',
-                color: '#6b7280',
+                marginTop: mm(2),
+                textAlign: 'right',
+                fontSize: '7.5pt',
+                color: '#000000',
               }}
             >
-              <div>
-                <FileText style={{ display: 'inline', width: '7pt', height: '7pt', marginRight: mm(0.4), verticalAlign: 'middle' }} />
-                Currency: {currency}
-              </div>
-              <div style={{ fontStyle: 'italic' }}>
-                This is a system-generated report.
-              </div>
+              Page {p + 1} of {totalPages}
             </div>
-          </div>
+          )}
         </div>
       );
-    }
+    });
 
     return pages;
   };
