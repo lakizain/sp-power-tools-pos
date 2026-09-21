@@ -31,10 +31,6 @@ export function InventoryManager() {
   const [customToDate, setCustomToDate] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
-  const [manualCheckIds, setManualCheckIds] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem('manualCheckIds');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
   const [showStockAdjustModal, setShowStockAdjustModal] = useState(false);
   const [stockAdjustProducts, setStockAdjustProducts] = useState<Product[]>([]);
 
@@ -62,10 +58,6 @@ export function InventoryManager() {
     loadDbCategories();
     loadSuppliers();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('manualCheckIds', JSON.stringify(Array.from(manualCheckIds)));
-  }, [manualCheckIds]);
 
   const activeDbCategoryNames = dbCategories.filter(c => c.active).map(c => c.name);
   const productCategoryNames = Array.from(new Set(state.products.map((p: Product) => p.category)));
@@ -348,22 +340,6 @@ export function InventoryManager() {
     }
   };
 
-  const handleToggleManualCheck = (productId: string) => {
-    setManualCheckIds(prev => {
-      const next = new Set(prev);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
-      }
-      return next;
-    });
-  };
-
-  const handleClearManualChecks = () => {
-    setManualCheckIds(new Set());
-  };
-
   const handleSingleStockAdjust = (product: Product) => {
     setStockAdjustProducts([product]);
     setShowStockAdjustModal(true);
@@ -401,14 +377,6 @@ export function InventoryManager() {
         </div>
         
         <div className="flex flex-wrap gap-3">
-          {manualCheckIds.size > 0 && (
-            <button
-              onClick={handleClearManualChecks}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-all font-medium"
-            >
-              <span>Clear Checks ({manualCheckIds.size})</span>
-            </button>
-          )}
           {selectedProductIds.size > 0 && (
             <button
               onClick={handleBulkStockAdjust}
@@ -637,9 +605,6 @@ export function InventoryManager() {
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
                   />
                 </th>
-                <th className="table-header-cell w-12" title="Manual Check">
-                  <span className="text-xs text-gray-500">✓</span>
-                </th>
                 <th className="table-header-cell">Product</th>
                 <th className="table-header-cell">SKU</th>
                 <th className="table-header-cell">Category</th>
@@ -655,8 +620,7 @@ export function InventoryManager() {
                 const isLowStock = product.trackInventory && product.stock <= product.minStock;
                 const isOutOfStock = product.trackInventory && product.stock === 0;
                 const isSelected = selectedProductIds.has(product.id);
-                const isManuallyChecked = manualCheckIds.has(product.id);
-
+                
                 return (
                   <tr key={product.id} className={`table-row ${isSelected ? 'bg-indigo-50/50' : ''}`}>
                     <td className="table-cell w-12">
@@ -665,15 +629,6 @@ export function InventoryManager() {
                         checked={isSelected}
                         onChange={() => handleToggleSelect(product.id)}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4 cursor-pointer"
-                      />
-                    </td>
-                    <td className="table-cell w-12">
-                      <input
-                        type="checkbox"
-                        checked={isManuallyChecked}
-                        onChange={() => handleToggleManualCheck(product.id)}
-                        className="rounded border-green-300 text-green-600 focus:ring-green-500 h-4 w-4 cursor-pointer"
-                        title="Mark as checked in manual list"
                       />
                     </td>
                     <td className="table-cell">
