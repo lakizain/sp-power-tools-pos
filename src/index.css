@@ -16,6 +16,7 @@
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
     line-height: 1.6;
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.3s ease, color 0.3s ease;
@@ -182,12 +183,14 @@
   .modal-footer {
     @apply px-6 py-5 border-t border-secondary-200/50 flex justify-end space-x-3 flex-shrink-0;
     @apply dark:border-secondary-700/50;
+    flex-wrap: wrap;
   }
   
   /* Modern Table Components */
   .table {
     @apply min-w-full divide-y divide-secondary-200;
     @apply dark:divide-secondary-700;
+    min-width: max-content;
   }
   
   .table-header {
@@ -254,6 +257,13 @@
   .nav-item-active {
     @apply bg-primary-50 text-primary-700 font-semibold shadow-soft;
     @apply dark:bg-primary-900/30 dark:text-primary-300;
+  }
+
+  .overflow-x-auto {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
   }
 }
 
@@ -532,6 +542,61 @@
   * {
     box-shadow: none !important;
     text-shadow: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  main {
+    min-width: 0;
+  }
+
+  .table-header-cell,
+  .table-cell {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  .table-header-cell,
+  .table-cell {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-height: calc(100dvh - 1rem);
+    border-radius: 1.25rem;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .modal-header {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .modal-body {
+    max-height: calc(100dvh - 170px);
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .modal-footer {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .modal-footer > * {
+    flex: 1 1 8rem;
   }
 }
 
