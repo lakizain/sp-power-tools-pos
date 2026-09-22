@@ -96,7 +96,7 @@ export function POSTerminal() {
       if (product.isWeightBased) {
         Swal.fire({
           title: product.name,
-          text: 'Weight-based product detected. Please click on the product card to enter weight.',
+          text: 'Weight or measurement-based product detected. Please click on the product card to enter the quantity.',
           icon: 'info',
           confirmButtonText: 'OK',
           timer: 3000,

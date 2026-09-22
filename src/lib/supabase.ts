@@ -50,7 +50,8 @@ function initSupabase(): SupabaseClient<Database> {
     supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
-        persistSession: true,
+           persistSession: true,
+           storage: window.sessionStorage,
         detectSessionInUrl: true
       }
     })

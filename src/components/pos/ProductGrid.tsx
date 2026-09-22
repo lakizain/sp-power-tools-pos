@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Plus, Package, Scale, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, Package, Scale, Ruler, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Product, ProductCategory } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { matchesAnyField } from '../../lib/searchUtils';
@@ -7,6 +7,8 @@ import { matchesAnyField } from '../../lib/searchUtils';
 interface ProductGridProps {
   onAddToCart: (product: Product, weight?: number) => void;
 }
+
+const isLengthUnit = (unit?: string) => unit === 'm' || unit === 'mm';
 
 export function ProductGrid({ onAddToCart }: ProductGridProps) {
   const { state } = useApp();
@@ -197,12 +199,12 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
         </div>
       </div>
 
-      {/* Weight Input Modal */}
+      {/* Measurement Input Modal */}
       {showWeightModal && (
         <div className="modal-overlay">
           <div className="modal max-w-sm">
             <div className="modal-header">
-              <h3 className="text-lg font-bold text-gray-900">Enter Weight</h3>
+              <h3 className="text-lg font-bold text-gray-900">Enter Quantity</h3>
               <button
                 onClick={() => setShowWeightModal(null)}
                 className="text-gray-400 hover:text-gray-600"
@@ -214,7 +216,11 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
             <div className="modal-body space-y-4">
               <div className="text-center">
                 <div className="bg-blue-100 p-4 rounded-2xl mb-4">
-                  <Scale className="h-8 w-8 text-blue-600 mx-auto" />
+                  {isLengthUnit(showWeightModal.unit) ? (
+                    <Ruler className="h-8 w-8 text-blue-600 mx-auto" />
+                  ) : (
+                    <Scale className="h-8 w-8 text-blue-600 mx-auto" />
+                  )}
                 </div>
                 <h4 className="font-semibold text-gray-900">{showWeightModal.name}</h4>
                 <p className="text-sm text-gray-600">
@@ -224,7 +230,7 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Weight ({showWeightModal.unit})
+                  Quantity ({showWeightModal.unit})
                 </label>
                 <input
                   type="number"
@@ -232,7 +238,7 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
                   className="input"
-                  placeholder={`Enter weight in ${showWeightModal.unit}`}
+                  placeholder={`Enter quantity in ${showWeightModal.unit}`}
                   autoFocus
                 />
               </div>
@@ -309,10 +315,10 @@ function ProductCard({ product, onAddToCart, isTouchMode, currency }: ProductCar
             <Package className={`text-gray-400 ${isTouchMode ? 'h-10 w-10' : 'h-8 w-8'}`} />
           )}
           
-          {/* Weight-based indicator */}
+          {/* Measurement-based indicator */}
           {product.isWeightBased && (
             <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs font-semibold px-2 py-1 rounded-full flex items-center space-x-1">
-              <Scale className="h-3 w-3" />
+              {isLengthUnit(product.unit) ? <Ruler className="h-3 w-3" /> : <Scale className="h-3 w-3" />}
               <span>{product.unit}</span>
             </div>
           )}
@@ -370,8 +376,10 @@ function ProductCard({ product, onAddToCart, isTouchMode, currency }: ProductCar
             isTouchMode ? 'btn-lg touch-friendly' : 'btn-md'
           }`}
         >
-          {product.isWeightBased ? <Scale className={`${isTouchMode ? 'h-5 w-5' : 'h-4 w-4'}`} /> : <Plus className={`${isTouchMode ? 'h-5 w-5' : 'h-4 w-4'}`} />}
-          <span>{isOutOfStock ? 'Out of Stock' : product.isWeightBased ? 'Enter Weight' : 'Add to Cart'}</span>
+          {product.isWeightBased ? (
+            isLengthUnit(product.unit) ? <Ruler className={`${isTouchMode ? 'h-5 w-5' : 'h-4 w-4'}`} /> : <Scale className={`${isTouchMode ? 'h-5 w-5' : 'h-4 w-4'}`} />
+          ) : <Plus className={`${isTouchMode ? 'h-5 w-5' : 'h-4 w-4'}`} />}
+          <span>{isOutOfStock ? 'Out of Stock' : product.isWeightBased ? 'Enter Quantity' : 'Add to Cart'}</span>
         </button>
       </div>
     </div>

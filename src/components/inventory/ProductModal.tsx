@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { X, Scale, ScanLine, Wand2, Printer, FolderPlus, RefreshCw, SlidersHorizontal, Package } from 'lucide-react';
+import { X, Scale, Ruler, ScanLine, Wand2, Printer, FolderPlus, RefreshCw, SlidersHorizontal, Package } from 'lucide-react';
 import { Product, ProductBatch, ProductCategory, Supplier } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import Swal from 'sweetalert2';
@@ -832,7 +832,8 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                 />
                 <div className="flex items-center space-x-2">
                   <Scale className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700 select-none cursor-pointer">Weight-based pricing</span>
+                  <Ruler className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700 select-none cursor-pointer">Weight or measurement-based pricing</span>
                 </div>
               </label>
             </div>
@@ -889,6 +890,8 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                       <option value="oz">Ounce (oz)</option>
                       <option value="l">Liter (l)</option>
                       <option value="ml">Milliliter (ml)</option>
+                      <option value="m">Meter (m)</option>
+                      <option value="mm">Millimeter (mm)</option>
                     </select>
                   </div>
                 </>
