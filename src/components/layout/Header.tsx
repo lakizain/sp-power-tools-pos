@@ -64,6 +64,26 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
       items.push({ id: 'inventory', label: 'Inventory', icon: Package, color: 'text-purple-600' });
     }
 
+    // Product Rentals - Optional feature
+    if (isAdminOrManager && features.productRentals) {
+      items.push({ id: 'rentals', label: 'Rentals', icon: KeyRound, color: 'text-violet-600' });
+    }
+
+    // Reports - Manager and Admin can access
+    if (isAdminOrManager) {
+      items.push({ id: 'reports', label: 'Reports', icon: BarChart3, color: 'text-red-600' });
+    }
+
+    // Expense Tracking - Optional feature
+    if (isAdminOrManager && features.expenseTracking) {
+      items.push({ id: 'expenses', label: 'Expenses', icon: Wallet, color: 'text-rose-600' });
+    }
+
+    // Product Returns - Optional feature
+    if (isAdminOrManager && features.productReturns) {
+      items.push({ id: 'returns', label: 'Returns', icon: RotateCcw, color: 'text-amber-600' });
+    }
+
     // Customers - Manager and Admin can access
     if (isAdminOrManager) {
       items.push({ id: 'customers', label: 'Customers', icon: Users, color: 'text-orange-600' });
@@ -72,21 +92,6 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
     // Outstanding Payments - Optional feature
     if (isAdminOrManager && features.outstandingPayments) {
       items.push({ id: 'payments', label: 'Payments', icon: CreditCard, color: 'text-cyan-600' });
-    }
-
-    // Product Returns - Optional feature
-    if (isAdminOrManager && features.productReturns) {
-      items.push({ id: 'returns', label: 'Returns', icon: RotateCcw, color: 'text-amber-600' });
-    }
-
-    // Product Rentals - Optional feature
-    if (isAdminOrManager && features.productRentals) {
-      items.push({ id: 'rentals', label: 'Rentals', icon: KeyRound, color: 'text-violet-600' });
-    }
-
-    // Expense Tracking - Optional feature
-    if (isAdminOrManager && features.expenseTracking) {
-      items.push({ id: 'expenses', label: 'Expenses', icon: Wallet, color: 'text-rose-600' });
     }
 
     // Supplier Management - Optional feature
@@ -102,11 +107,6 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
     // Alert Monitoring - Optional feature
     if (isAdminOrManager && features.alertMonitoring) {
       items.push({ id: 'alerts', label: 'Alerts', icon: AlertTriangle, color: 'text-red-600' });
-    }
-
-    // Reports - Manager and Admin can access
-    if (isAdminOrManager) {
-      items.push({ id: 'reports', label: 'Reports', icon: BarChart3, color: 'text-red-600' });
     }
 
     // Users - Admin only

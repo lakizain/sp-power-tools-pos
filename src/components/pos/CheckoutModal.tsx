@@ -338,9 +338,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         }
       }
 
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       const invoiceNumber = await generateInvoice();
 
       // Build payments: if split used, use payments state, otherwise build from single method
