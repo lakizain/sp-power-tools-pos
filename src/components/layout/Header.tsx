@@ -120,7 +120,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
   const navigationItems = getNavigationItems();
 
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-secondary-200/50 dark:bg-secondary-800/80 dark:border-secondary-700/50 sticky top-0 z-40 shadow-soft">
+    <header className="bg-[#211f1e] backdrop-blur-md border-b border-[#211f1e] dark:bg-secondary-800/80 dark:border-secondary-700/50 sticky top-0 z-40 shadow-soft">
       <div className="px-4 lg:px-6">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo and Store Name */}
@@ -138,10 +138,10 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
                 </div>
               )}
               <div className="hidden sm:block">
-                <h1 className="text-lg lg:text-xl font-bold text-secondary-900 dark:text-secondary-100 truncate max-w-48">
+                <h1 className="text-lg lg:text-xl font-bold text-white dark:text-secondary-100 truncate max-w-48">
                   {state.settings.storeName}
                 </h1>
-                <p className="text-xs text-secondary-500 dark:text-secondary-400 hidden lg:block">6+ Software solutions</p>
+                <p className="text-xs text-white/60 dark:text-secondary-400 hidden lg:block">6+ Software solutions</p>
               </div>
             </div>
 
@@ -153,7 +153,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
                   onClick={() => onViewChange(item.id)}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-2xl text-sm font-semibold transition-all duration-300 flex-shrink-0 ${currentView === item.id
                     ? 'bg-primary-50 text-primary-700 shadow-soft dark:bg-primary-900/30 dark:text-primary-300'
-                    : 'text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
+                    : 'text-white/80 hover:text-white hover:bg-white/10 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
                     }`}
                 >
                   <item.icon className={`h-4 w-4 ${currentView === item.id ? 'text-primary-600' : item.color}`} />
@@ -168,7 +168,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="hidden md:flex items-center space-x-2 px-3 py-2 rounded-2xl bg-secondary-100/50 hover:bg-secondary-200/50 transition-all duration-300 text-sm font-medium"
+              className="hidden md:flex items-center space-x-2 px-3 py-2 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all duration-300 text-sm font-medium"
               title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
             >
               {isDark ? (
@@ -184,7 +184,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
             {/* Interface Mode Toggle - Hidden on mobile */}
             <button
               onClick={toggleInterfaceMode}
-              className="hidden md:flex items-center space-x-2 px-3 py-2 rounded-2xl bg-secondary-100/50 hover:bg-secondary-200/50 transition-all duration-300 text-sm font-medium"
+              className="hidden md:flex items-center space-x-2 px-3 py-2 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all duration-300 text-sm font-medium"
               title={`Switch to ${state.settings.interfaceMode === 'touch' ? 'Traditional' : 'Touch'} Mode`}
             >
               {state.settings.interfaceMode === 'touch' ? (
@@ -211,7 +211,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
               className={`p-2 rounded-2xl transition-all duration-300 relative ${
                 currentView === 'alerts'
                   ? 'bg-primary-50 text-primary-700 shadow-soft dark:bg-primary-900/30 dark:text-primary-300'
-                  : 'text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
+                  : 'text-white/70 hover:text-white hover:bg-white/10 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
               }`}
               title="Alerts & Notifications"
             >
@@ -222,10 +222,10 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
             {/* User Menu */}
             <div className="flex items-center space-x-3">
               <div className="hidden lg:block text-right">
-                <p className="text-sm font-semibold text-secondary-900 truncate max-w-32">
+                <p className="text-sm font-semibold text-white truncate max-w-32">
                   {state.currentUser?.name}
                 </p>
-                <p className="text-xs text-secondary-500 capitalize">
+                <p className="text-xs text-white/60 capitalize">
                   {state.currentUser?.role}
                 </p>
               </div>
@@ -238,14 +238,14 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
                 <div className="hidden md:flex items-center space-x-1">
                   <button
                     onClick={() => onViewChange('settings')}
-                    className="p-2 rounded-2xl text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100/50 transition-all duration-300"
+                    className="p-2 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300"
                   >
                     <Settings className="h-4 w-4" />
                   </button>
 
                   <button
                     onClick={handleLogout}
-                    className="p-2 rounded-2xl text-secondary-500 hover:text-danger-600 hover:bg-danger-50 transition-all duration-300"
+                    className="p-2 rounded-2xl text-white/70 hover:text-red-300 hover:bg-white/10 transition-all duration-300"
                   >
                     <LogOut className="h-4 w-4" />
                   </button>
@@ -256,7 +256,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="lg:hidden p-2 rounded-2xl text-secondary-500 hover:text-secondary-700 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50 transition-all duration-300"
+              className="lg:hidden p-2 rounded-2xl text-white/70 hover:text-white hover:bg-white/10 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50 transition-all duration-300"
             >
               {showMobileMenu ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -265,7 +265,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
 
         {/* Mobile Navigation Menu */}
         {showMobileMenu && (
-          <div className="lg:hidden border-t border-secondary-200/50 dark:border-secondary-700/50 py-4 animate-slide-down">
+          <div className="lg:hidden border-t border-white/20 dark:border-secondary-700/50 py-4 animate-slide-down">
             <nav className="space-y-2">
               {navigationItems.map((item) => (
                 <button
@@ -276,7 +276,7 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
                   }}
                   className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-300 ${currentView === item.id
                     ? 'bg-primary-50 text-primary-700 shadow-soft dark:bg-primary-900/30 dark:text-primary-300'
-                    : 'text-secondary-600 hover:text-secondary-900 hover:bg-secondary-100/50 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
+                    : 'text-white/80 hover:text-white hover:bg-white/10 dark:text-secondary-400 dark:hover:text-secondary-200 dark:hover:bg-secondary-700/50'
                     }`}
                 >
                   <item.icon className={`h-5 w-5 ${currentView === item.id ? 'text-primary-600 dark:text-primary-400' : item.color}`} />

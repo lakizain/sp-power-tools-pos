@@ -180,10 +180,10 @@ export function ProductGrid({ onAddToCart }: ProductGridProps) {
               <p className="text-gray-400 text-sm mt-1">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <div className={`grid gap-4 lg:gap-6 ${
+            <div className={`grid gap-3 lg:gap-4 ${
               isTouchMode 
                 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
-                : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+                : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'
             }`}>
               {filteredProducts.map((product) => (
                 <ProductCard
@@ -293,17 +293,17 @@ function ProductCard({ product, onAddToCart, isTouchMode, currency }: ProductCar
 
   return (
     <div
-      className={`card card-hover cursor-pointer transition-all duration-200 ${
+      className={`card bg-secondary-100/90 border-[#1f1f1f] card-hover cursor-pointer transition-all duration-200 ${
         isLowStock && !isOutOfStock ? 'border-orange-200 bg-orange-50' : ''
       } ${isOutOfStock ? 'border-red-200 bg-red-50 opacity-75' : ''} ${
-        isTouchMode ? 'p-4' : 'p-3'
+        isTouchMode ? 'p-4' : 'p-2'
       }`}
       onClick={() => !isOutOfStock && onAddToCart(product)}
     >
       <div className="flex flex-col h-full">
         {/* Product Image */}
-        <div className={`bg-gray-100 rounded-2xl mb-4 flex items-center justify-center relative overflow-hidden ${
-          isTouchMode ? 'h-32' : 'h-24'
+        <div className={`bg-secondary-200/80 rounded-2xl mb-2 flex items-center justify-center relative overflow-hidden ${
+          isTouchMode ? 'h-32' : 'h-20'
         }`}>
           {product.image ? (
             <img 
@@ -372,7 +372,7 @@ function ProductCard({ product, onAddToCart, isTouchMode, currency }: ProductCar
             if (!isOutOfStock) onAddToCart(product);
           }}
           disabled={isOutOfStock}
-          className={`btn btn-primary w-full mt-4 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 ${
+          className={`btn btn-primary w-full mt-2 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center space-x-2 ${
             isTouchMode ? 'btn-lg touch-friendly' : 'btn-md'
           }`}
         >

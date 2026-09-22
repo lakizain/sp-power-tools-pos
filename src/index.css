@@ -27,7 +27,7 @@
   }
 
   .dark body {
-    background-color: #0f172a;
+    background-color: #05090e;
     color: #f8fafc;
   }
 }
@@ -258,6 +258,81 @@
 }
 
 @layer utilities {
+  /* Keep legacy component utilities aligned with the brand palette. */
+  [class~="bg-blue-50"], [class~="bg-indigo-50"], [class~="bg-purple-50"], [class~="bg-violet-50"], [class~="bg-orange-50"] {
+    background-color: #fff4eb !important;
+  }
+
+  [class~="bg-amber-50"] {
+    background-color: #fff9e8 !important;
+  }
+
+  [class~="bg-blue-100"], [class~="bg-indigo-100"], [class~="bg-purple-100"], [class~="bg-violet-100"], [class~="bg-orange-100"] {
+    background-color: #ffe4d1 !important;
+  }
+
+  [class~="bg-amber-100"] {
+    background-color: #ffefbd !important;
+  }
+
+  [class~="bg-blue-500"], [class~="bg-indigo-500"], [class~="bg-orange-500"] {
+    background-color: #fd6801 !important;
+  }
+
+  [class~="bg-purple-500"], [class~="bg-violet-500"], [class~="bg-amber-500"] {
+    background-color: #e49400 !important;
+  }
+
+  [class~="bg-blue-600"], [class~="bg-indigo-600"], [class~="bg-orange-600"] {
+    background-color: #e85b00 !important;
+  }
+
+  [class~="bg-purple-600"], [class~="bg-violet-600"], [class~="bg-amber-600"] {
+    background-color: #c97d00 !important;
+  }
+
+  [class~="text-blue-600"], [class~="text-indigo-600"], [class~="text-orange-600"], [class~="text-blue-700"], [class~="text-indigo-700"], [class~="text-orange-700"] {
+    color: #fd6801 !important;
+  }
+
+  [class~="text-purple-600"], [class~="text-violet-600"], [class~="text-amber-600"], [class~="text-purple-700"], [class~="text-violet-700"], [class~="text-amber-700"] {
+    color: #e49400 !important;
+  }
+
+  [class~="border-blue-200"], [class~="border-indigo-200"], [class~="border-purple-200"], [class~="border-violet-200"], [class~="border-orange-200"] {
+    border-color: #ffc8a3 !important;
+  }
+
+  [class~="border-amber-200"] {
+    border-color: #ffdf80 !important;
+  }
+
+  [class~="border-blue-500"], [class~="border-indigo-500"], [class~="border-orange-500"] {
+    border-color: #fd6801 !important;
+  }
+
+  [class~="border-purple-500"], [class~="border-violet-500"], [class~="border-amber-500"] {
+    border-color: #e49400 !important;
+  }
+
+  [class~="from-blue-500"], [class~="from-indigo-500"], [class~="from-orange-500"] {
+    --tw-gradient-from: #fd6801 var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgb(253 104 1 / 0) var(--tw-gradient-to-position) !important;
+  }
+
+  [class~="to-blue-600"], [class~="to-indigo-600"], [class~="to-orange-600"] {
+    --tw-gradient-to: #e85b00 var(--tw-gradient-to-position) !important;
+  }
+
+  [class~="from-purple-500"], [class~="from-violet-500"], [class~="from-amber-500"] {
+    --tw-gradient-from: #e49400 var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: rgb(228 148 0 / 0) var(--tw-gradient-to-position) !important;
+  }
+
+  [class~="to-purple-600"], [class~="to-violet-600"], [class~="to-amber-600"] {
+    --tw-gradient-to: #c97d00 var(--tw-gradient-to-position) !important;
+  }
+
   .text-balance {
     text-wrap: balance;
   }
@@ -462,12 +537,12 @@
 
 /* Focus styles for accessibility */
 .focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid #fd6801;
   outline-offset: 2px;
 }
 
 .dark .focus-visible {
-  outline-color: #60a5fa;
+  outline-color: #e49400;
 }
 
 /* Modern Loading states */

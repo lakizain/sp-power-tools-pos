@@ -316,7 +316,7 @@ function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount
     : item.product.price;
 
   return (
-    <div className="bg-white border-b border-gray-100 py-1.5 px-1.5">
+    <div className="bg-secondary-100/70 border-b border-secondary-200 py-1.5 px-1.5">
       <div className="flex items-start gap-1.5">
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-1">
