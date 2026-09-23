@@ -115,7 +115,9 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
         name: product.name,
         sku: product.sku,
         barcode: product.barcode || '',
-        price: product.price.toString(),
+        price: product.isWeightBased
+          ? (product.pricePerUnit ?? product.price).toString()
+          : product.price.toString(),
         cost: product.cost.toString(),
         stock: product.stock.toString(),
         minStock: product.minStock.toString(),
@@ -290,10 +292,10 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
     }
 
     if (formData.isWeightBased) {
-      if (!formData.pricePerUnit || parseFloat(formData.pricePerUnit) <= 0) {
+      if (!formData.price || parseFloat(formData.price) <= 0) {
         await Swal.fire({
           title: 'Error!',
-          text: 'Please enter a valid price per unit for weight-based product',
+          text: 'Please enter a valid sale price for weight-based product',
           icon: 'error',
           confirmButtonText: 'OK'
         });
@@ -354,7 +356,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
       name: formData.name,
       sku: formData.sku,
       barcode: normalizedBarcode,
-      price: formData.isWeightBased ? 0 : parseFloat(formData.price),
+      price: parseFloat(formData.price),
       cost: parseFloat(formData.cost),
       stock: formData.trackInventory ? parseInt(formData.stock) : 999999,
       minStock: formData.trackInventory ? parseInt(formData.minStock) : 0,
@@ -363,7 +365,7 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
       taxable: formData.taxable,
       active: formData.active,
       isWeightBased: formData.isWeightBased,
-      pricePerUnit: formData.isWeightBased ? parseFloat(formData.pricePerUnit) : undefined,
+      pricePerUnit: formData.isWeightBased ? parseFloat(formData.price) : undefined,
       unit: formData.isWeightBased ? formData.unit : undefined,
       image: formData.image || undefined,
       trackInventory: formData.trackInventory,
@@ -454,6 +456,12 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
         if (suggested !== null) {
           next.price = suggested.toString();
         }
+      }
+      if (name === 'price' && next.isWeightBased) {
+        next.pricePerUnit = value;
+      }
+      if (name === 'isWeightBased' && checked) {
+        next.pricePerUnit = next.price;
       }
       if (!product && name === 'stock') {
         const stockNum = parseInt(value);
@@ -860,19 +868,37 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sale Price *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      name="price"
+                      value={formData.price}
+                      onChange={handleChange}
+                      required
+                      className="input"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Price per Unit *
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       min="0"
-                      name="pricePerUnit"
-                      value={formData.pricePerUnit}
-                      onChange={handleChange}
+                      value={formData.price}
+                      readOnly
                       required
-                      className="input"
+                      className="input bg-gray-50"
                       placeholder="0.00"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Same as sale price per {formData.unit}.
+                    </p>
                   </div>
                   <div className="md:col-start-2 md:row-start-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
