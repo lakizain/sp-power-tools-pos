@@ -28,9 +28,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   const [appliedDiscounts, setAppliedDiscounts] = useState<AppliedDiscount[]>([]);
   const [freeGifts, setFreeGifts] = useState<CartItem[]>([]);
   const [showDiscountAlert, setShowDiscountAlert] = useState(false);
-  const [billDiscountType, setBillDiscountType] = useState<'percentage' | 'fixed'>('percentage');
-  const [billDiscountValue, setBillDiscountValue] = useState('');
-  const [billDiscountAmount, setBillDiscountAmount] = useState(0);
   const [cardDetails, setCardDetails] = useState<Partial<CardDetails>>({
     bankName: '',
     cardType: 'unknown',
@@ -131,7 +128,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     return sum + (price * item.quantity);
   }, 0);
   const manualDiscount = state.cart.reduce((sum, item) => sum + (item.discount || 0), 0);
-  const initialTotal = Math.max(0, subtotal - manualDiscount - billDiscountAmount);
+  const initialTotal = Math.max(0, subtotal - manualDiscount);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -144,9 +141,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setAppliedDiscounts([]);
       setFreeGifts([]);
       setShowDiscountAlert(false);
-      setBillDiscountType('percentage');
-      setBillDiscountValue('');
-      setBillDiscountAmount(0);
       setPaymentMethod('cash');
       setPayments([]);
       setPendingPayment({ method: 'cash', amount: '' });
@@ -240,39 +234,10 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   }, [isOpen, state.cart, state.selectedCustomer, paymentMethod, subtotal, state.discounts, state.products, cardDetails]);
 
   const totalAutoDiscount = appliedDiscounts.reduce((sum, discount) => sum + discount.discountAmount, 0);
-  const totalDiscount = manualDiscount + totalAutoDiscount + billDiscountAmount;
+  const totalDiscount = manualDiscount + totalAutoDiscount;
   const taxAmount = 0;
   const total = subtotal - totalDiscount;
   const change = parseFloat(amountPaid) - total;
-
-  const applyBillDiscount = () => {
-    const parsedValue = Number(billDiscountValue);
-    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
-      swalConfig.warning('Enter a valid discount value');
-      return;
-    }
-
-    let discount = 0;
-    if (billDiscountType === 'percentage') {
-      discount = (subtotal * Math.min(parsedValue, 100)) / 100;
-    } else {
-      discount = Math.min(parsedValue, subtotal);
-    }
-
-    setBillDiscountAmount(discount);
-  };
-
-  const clearBillDiscount = () => {
-    setBillDiscountValue('');
-    setBillDiscountAmount(0);
-  };
-
-  const billDiscountEntry = billDiscountAmount > 0 ? {
-    discountId: 'manual-bill-discount',
-    discountName: `Manual ${billDiscountType === 'percentage' ? `${billDiscountValue}%` : `Discount`}`,
-    discountAmount: billDiscountAmount,
-    type: billDiscountType,
-  } satisfies AppliedDiscount : null;
 
   const paidSoFar = payments.reduce((s, p) => s + p.amount, 0);
   const remaining = Math.max(0, total - paidSoFar);
@@ -371,7 +336,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         timestamp: new Date(),
         receiptNumber: invoiceNumber,
         notes: paymentMethod === 'credit' ? creditNotes : undefined,
-        appliedDiscounts: billDiscountEntry ? [...appliedDiscounts, billDiscountEntry] : appliedDiscounts,
+        appliedDiscounts,
         freeGifts: freeGifts.length > 0 ? freeGifts : undefined,
       };
 
@@ -583,12 +548,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     <span>Subtotal:</span>
                     <span className="font-medium">{state.settings.currency} {subtotal.toFixed(2)}</span>
                   </div>
-                  {billDiscountAmount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Bill Discount:</span>
-                      <span className="font-medium">-{state.settings.currency} {billDiscountAmount.toFixed(2)}</span>
-                    </div>
-                  )}
                   {totalDiscount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Total Discount:</span>
@@ -612,8 +571,8 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     <span>{state.settings.currency} {subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Discount (%):</span>
-                    <span>{billDiscountType === 'percentage' && billDiscountValue ? `${billDiscountValue}%` : '0%'}</span>
+                    <span>Discount:</span>
+                    <span>{state.settings.currency} {totalDiscount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between font-semibold border-t border-gray-200 pt-2">
                     <span>Amount:</span>
@@ -621,37 +580,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center space-x-2">
-                  <select
-                    value={billDiscountType}
-                    onChange={(e) => {
-                      setBillDiscountType(e.target.value as 'percentage' | 'fixed');
-                      setBillDiscountValue('');
-                      setBillDiscountAmount(0);
-                    }}
-                    className="select w-24"
-                  >
-                    <option value="percentage">%</option>
-                    <option value="fixed">LKR</option>
-                  </select>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={billDiscountValue}
-                    onChange={(e) => setBillDiscountValue(e.target.value)}
-                    className="input flex-1"
-                    placeholder={billDiscountType === 'percentage' ? 'Discount %' : 'Discount amount'}
-                  />
-                  <button type="button" onClick={applyBillDiscount} className="btn btn-primary btn-sm">
-                    Apply
-                  </button>
-                  {billDiscountAmount > 0 && (
-                    <button type="button" onClick={clearBillDiscount} className="text-xs text-red-600 hover:text-red-700">
-                      Clear
-                    </button>
-                  )}
-                </div>
               </div>
 
               <div>
