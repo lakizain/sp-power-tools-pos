@@ -24,10 +24,14 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
       const price = item.product.isWeightBased 
         ? (item.product.pricePerUnit || 0) * (item.weight || 1)
         : item.product.price;
+      const discount = item.discountType === 'percentage' && item.discountRate !== undefined
+        ? (price * newQuantity * item.discountRate) / 100
+        : item.discount || 0;
       const updatedItem = {
         ...item,
         quantity: newQuantity,
-        subtotal: (price * newQuantity) - (item.discount || 0)
+        discount,
+        subtotal: (price * newQuantity) - discount
       };
       dispatch({ type: 'UPDATE_CART_ITEM', payload: { index, item: updatedItem } });
     }
@@ -53,6 +57,7 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
     const updatedItem = {
       ...item,
       discount: discountAmount,
+      discountRate: discountType === 'percentage' ? discount : undefined,
       discountType,
       subtotal: (price * item.quantity) - discountAmount
     };
@@ -257,18 +262,20 @@ interface CartItemCardProps {
 }
 
 function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount, isTouchMode, currency }: CartItemCardProps) {
-  const [showDiscountInput, setShowDiscountInput] = useState(false);
-  const [discountValue, setDiscountValue] = useState('');
+  const [showDiscountInput, setShowDiscountInput] = useState(item.discountRate !== undefined);
+  const [discountValue, setDiscountValue] = useState(item.discountRate?.toString() || '');
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
   const [quantityInput, setQuantityInput] = useState(item.quantity.toString());
   const [isEditingQuantity, setIsEditingQuantity] = useState(false);
 
   const handleDiscountSubmit = () => {
     const value = parseFloat(discountValue);
-    if (!isNaN(value) && value > 0) {
+    const isValidValue = discountType === 'percentage'
+      ? !isNaN(value) && value >= 0 && value <= 100
+      : !isNaN(value) && value > 0;
+    if (isValidValue) {
       onApplyDiscount(index, value, discountType);
-      setShowDiscountInput(false);
-      setDiscountValue('');
+      setShowDiscountInput(true);
     }
   };
 
@@ -311,6 +318,14 @@ function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount
     }
   }, [item.quantity, isEditingQuantity]);
 
+  useEffect(() => {
+    if (!showDiscountInput) {
+      setDiscountValue(item.discountType === 'percentage' && item.discountRate !== undefined
+        ? item.discountRate.toString()
+        : '');
+    }
+  }, [item.discountRate, item.discountType, showDiscountInput]);
+
   const unitPrice = item.product.isWeightBased
     ? (item.product.pricePerUnit || 0)
     : item.product.price;
@@ -338,7 +353,7 @@ function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount
             </span>
             {item.discount > 0 && (
               <span className="text-green-600 text-[11px] font-medium leading-none whitespace-nowrap">
-                - {item.discountType === 'percentage' ? `${item.discount}%` : `${currency}${item.discount.toFixed(2)}`}
+                - {item.discountType === 'percentage' ? `${item.discountRate ?? 0}%` : `${currency}${item.discount.toFixed(2)}`}
               </span>
             )}
           </div>
@@ -395,7 +410,13 @@ function CartItemCard({ item, index, onUpdateQuantity, onRemove, onApplyDiscount
         <div className="flex items-center space-x-1 pt-1 mt-1 border-t border-gray-100 animate-slide-up">
           <select
             value={discountType}
-            onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'fixed')}
+            onChange={(e) => {
+              const nextType = e.target.value as 'percentage' | 'fixed';
+              setDiscountType(nextType);
+              setDiscountValue(nextType === 'percentage' && item.discountRate !== undefined
+                ? item.discountRate.toString()
+                : '');
+            }}
             className="h-6 px-1 text-[10px] rounded border border-gray-300 bg-white w-10"
           >
             <option value="percentage">%</option>

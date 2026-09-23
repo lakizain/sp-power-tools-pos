@@ -35,7 +35,7 @@ export interface ProductBatch {
 }
 
 export type StockAdjustmentMode = 'add' | 'remove' | 'set';
-export type StockAdjustmentReason = 'purchase' | 'return' | 'stock_count' | 'damaged' | 'theft' | 'other';
+export type StockAdjustmentReason = 'purchase' | 'return' | 'stock_count' | 'damaged' | 'theft' | 'internal_use' | 'other';
 
 export interface StockAdjustment {
   id: string;
@@ -91,6 +91,7 @@ export interface CartItem {
   quantity: number;
   weight?: number; // For weight-based products
   discount: number;
+  discountRate?: number;
   discountType: 'percentage' | 'fixed';
   subtotal: number;
   batchId?: string; // For batch tracking
@@ -206,9 +207,27 @@ export interface AppSettings {
   exchangeRateProvider?: 'fixer' | 'currencylayer' | 'exchangerate' | 'manual';
   exchangeRateApiKey?: string;
   exchangeRateUpdateInterval?: number; // in minutes
+  priceRanges?: PriceRange[];
   // Optional feature toggles
   featureToggles?: FeatureToggles;
 }
+
+export interface PriceRange {
+  id: string;
+  minCost: number;
+  maxCost?: number;
+  markupPercentage: number;
+  discountPercentage: number;
+}
+
+export const DEFAULT_PRICE_RANGES: PriceRange[] = [
+  { id: 'under-1000', minCost: 0, maxCost: 1000, markupPercentage: 50, discountPercentage: 0 },
+  { id: '1000-5000', minCost: 1000, maxCost: 5000, markupPercentage: 45, discountPercentage: 0 },
+  { id: '5000-25000', minCost: 5000, maxCost: 25000, markupPercentage: 40, discountPercentage: 0 },
+  { id: '25000-50000', minCost: 25000, maxCost: 50000, markupPercentage: 35, discountPercentage: 0 },
+  { id: '50000-100000', minCost: 50000, maxCost: 100000, markupPercentage: 30, discountPercentage: 0 },
+  { id: '100000-250000', minCost: 100000, maxCost: 250000, markupPercentage: 25, discountPercentage: 0 },
+];
 
 export interface FeatureToggles {
   transactionDelete: boolean;

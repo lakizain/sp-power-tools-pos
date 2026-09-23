@@ -11,6 +11,7 @@ import { swalConfig } from '../../lib/sweetAlert';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 import { toValidEan13, isValidEan13 } from '../../lib/barcodeUtils';
 import Swal from 'sweetalert2';
+import { getRangeDiscountPercentage } from '../../lib/priceRangeUtils';
 
 export function POSTerminal() {
   const { state, dispatch } = useApp();
@@ -32,10 +33,14 @@ export function POSTerminal() {
       const newQuantity = existingItem.quantity + 1;
 
       if (!product.trackInventory || newQuantity <= product.stock) {
+        const discount = existingItem.discountType === 'percentage' && existingItem.discountRate !== undefined
+          ? (product.price * newQuantity * existingItem.discountRate) / 100
+          : existingItem.discount || 0;
         const updatedItem = {
           ...existingItem,
           quantity: newQuantity,
-          subtotal: product.price * newQuantity - (existingItem.discount || 0)
+          discount,
+          subtotal: product.price * newQuantity - discount
         };
         newCart[existingItemIndex] = updatedItem;
         dispatch({ type: 'UPDATE_CART_ITEM', payload: { index: existingItemIndex, item: updatedItem } });
@@ -43,12 +48,15 @@ export function POSTerminal() {
         return;
       }
     } else {
+      const discountRate = getRangeDiscountPercentage(product.cost, state.settings.priceRanges);
+      const discount = (product.price * discountRate) / 100;
       const newItem = {
         product,
         quantity: 1,
-        discount: 0,
+        discount,
+        discountRate,
         discountType: 'percentage' as const,
-        subtotal: product.price
+        subtotal: product.price - discount
       };
       newCart = [...state.cart, newItem];
       dispatch({ type: 'ADD_TO_CART', payload: newItem });
@@ -182,10 +190,14 @@ export function POSTerminal() {
 
       // Only check stock limits if inventory tracking is enabled
       if (!product.trackInventory || newQuantity <= product.stock) {
+        const discount = existingItem.discountType === 'percentage' && existingItem.discountRate !== undefined
+          ? (product.price * newQuantity * existingItem.discountRate) / 100
+          : existingItem.discount || 0;
         const updatedItem = {
           ...existingItem,
           quantity: newQuantity,
-          subtotal: product.price * newQuantity - (existingItem.discount || 0)
+          discount,
+          subtotal: product.price * newQuantity - discount
         };
         newCart[existingItemIndex] = updatedItem;
         dispatch({ type: 'UPDATE_CART_ITEM', payload: { index: existingItemIndex, item: updatedItem } });
@@ -197,14 +209,17 @@ export function POSTerminal() {
       const quantity = 1;
       const itemWeight = weight || undefined;
       const price = product.isWeightBased ? (product.pricePerUnit || 0) * (weight || 1) : product.price;
+      const discountRate = getRangeDiscountPercentage(product.cost, state.settings.priceRanges);
+      const discount = (price * discountRate) / 100;
 
       const newItem = {
         product,
         quantity,
         weight: itemWeight,
-        discount: 0,
+        discount,
+        discountRate,
         discountType: 'percentage' as const,
-        subtotal: price
+        subtotal: price - discount
       };
       newCart = [...state.cart, newItem];
       dispatch({ type: 'ADD_TO_CART', payload: newItem });

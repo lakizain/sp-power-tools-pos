@@ -225,6 +225,7 @@ export function ReportsManager() {
   const profitData = useMemo(() => {
     let totalCOGS = 0;
     let totalRevenue = 0;
+    let totalDiscounts = 0;
     const productProfit: Record<string, {
       id: string;
       name: string;
@@ -244,6 +245,7 @@ export function ReportsManager() {
 
     filteredSales.forEach(sale => {
       totalRevenue += sale.total;
+      totalDiscounts += sale.discountAmount || 0;
       sale.items.forEach(item => {
         const productId = item.product.id;
         const productCost = item.product.cost || 0;
@@ -302,6 +304,7 @@ export function ReportsManager() {
 
     return {
       totalRevenue,
+      totalDiscounts,
       totalCOGS,
       totalGrossProfit,
       grossProfitMargin,
@@ -378,6 +381,7 @@ export function ReportsManager() {
 
     const totals = [
       ['Revenue', `${currency} ${profitData.totalRevenue.toFixed(2)}`],
+      ['Discounts', `${currency} ${profitData.totalDiscounts.toFixed(2)}`],
       ['Gross Profit', `${currency} ${profitData.totalGrossProfit.toFixed(2)}`],
       ['Expenses', `${currency} ${profitData.totalExpenses.toFixed(2)}`],
       ['Net Profit', `${currency} ${profitData.netProfit.toFixed(2)}`],
@@ -538,7 +542,7 @@ export function ReportsManager() {
 
       {reportType === 'summary' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
             <div className="stat-card bg-gradient-to-br from-green-500 to-green-600">
               <div className="flex items-center justify-between relative z-10">
                 <div>
@@ -559,6 +563,18 @@ export function ReportsManager() {
                 </div>
                 <div className="bg-white/20 p-3 rounded-2xl">
                   <TrendingUp className="h-6 w-6 lg:h-8 lg:w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card bg-gradient-to-br from-orange-500 to-orange-600">
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium">Discounts</p>
+                  <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {profitData.totalDiscounts.toFixed(2)}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-2xl">
+                  <TrendingDown className="h-6 w-6 lg:h-8 lg:w-8" />
                 </div>
               </div>
             </div>

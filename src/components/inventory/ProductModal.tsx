@@ -10,6 +10,7 @@ import {
 } from '../../lib/barcodeUtils';
 import { BarcodeStickerPrint } from './BarcodeStickerPrint';
 import { CategoryModal } from './CategoryModal';
+import { getPriceRange } from '../../lib/priceRangeUtils';
 
 interface ProductModalProps {
   isOpen: boolean;
@@ -438,15 +439,9 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
 
   const calculateSuggestedSalePrice = (cost: number): number | null => {
     if (cost <= 0) return null;
-    let multiplier: number | null = null;
-    if (cost < 1000) multiplier = 1.50;
-    else if (cost < 5000) multiplier = 1.45;
-    else if (cost < 25000) multiplier = 1.40;
-    else if (cost < 50000) multiplier = 1.35;
-    else if (cost < 100000) multiplier = 1.30;
-    else if (cost <= 250000) multiplier = 1.25;
-    if (multiplier === null) return null;
-    return Math.round((cost * multiplier) * 100) / 100;
+    const range = getPriceRange(cost, state.settings.priceRanges);
+    if (!range) return null;
+    return Math.round((cost * (1 + range.markupPercentage / 100)) * 100) / 100;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -942,12 +937,12 @@ export function ProductModal({ isOpen, onClose, product, onOpenStockAdjustment }
                     className="input"
                     placeholder="0.00"
                   />
-                  {formData.cost && parseFloat(formData.cost) > 250000 && (
+                  {formData.cost && parseFloat(formData.cost) > 0 && calculateSuggestedSalePrice(parseFloat(formData.cost)) === null && (
                     <p className="text-xs text-amber-600 mt-1">
-                      ℹ️ Cost exceeds {state.settings.currency} 250,000 — please enter sale price manually
+                      No matching price range — please enter sale price manually
                     </p>
                   )}
-                  {formData.cost && parseFloat(formData.cost) <= 250000 && parseFloat(formData.cost) > 0 && (
+                  {formData.cost && parseFloat(formData.cost) > 0 && calculateSuggestedSalePrice(parseFloat(formData.cost)) !== null && (
                     <p className="text-xs text-emerald-600 mt-1">
                       ✓ Auto-calculated from cost. You can adjust manually.
                     </p>

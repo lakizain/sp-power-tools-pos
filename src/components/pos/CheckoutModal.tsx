@@ -141,7 +141,12 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setShowReceipt(false);
       setCompletedSale(null);
       setCreditNotes('');
+      setAppliedDiscounts([]);
+      setFreeGifts([]);
       setShowDiscountAlert(false);
+      setBillDiscountType('percentage');
+      setBillDiscountValue('');
+      setBillDiscountAmount(0);
       setPaymentMethod('cash');
       setPayments([]);
       setPendingPayment({ method: 'cash', amount: '' });

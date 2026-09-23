@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, PlusCircle, MinusCircle, Hash, AlertTriangle, Package, TrendingUp, TrendingDown, Equal } from 'lucide-react';
+import { X, PlusCircle, MinusCircle, Hash, AlertTriangle, Package, TrendingUp, TrendingDown, Equal, Wrench } from 'lucide-react';
 import { Product, StockAdjustmentMode, StockAdjustmentReason } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import Swal from 'sweetalert2';
@@ -10,6 +10,7 @@ const REASON_OPTIONS: { value: StockAdjustmentReason; label: string; icon: React
   { value: 'stock_count', label: 'Physical Stock Count', icon: <Hash className="h-4 w-4" /> },
   { value: 'damaged', label: 'Damaged / Write-off', icon: <AlertTriangle className="h-4 w-4" /> },
   { value: 'theft', label: 'Loss / Theft', icon: <TrendingDown className="h-4 w-4" /> },
+  { value: 'internal_use', label: 'Internal Shop Use', icon: <Wrench className="h-4 w-4" /> },
   { value: 'other', label: 'Other Adjustment', icon: <Equal className="h-4 w-4" /> },
 ];
 

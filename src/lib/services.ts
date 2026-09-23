@@ -782,6 +782,7 @@ export const settingsService = {
       exchangeRateProvider: data.exchange_rate_provider as any || 'exchangerate',
       exchangeRateApiKey: data.exchange_rate_api_key || undefined,
       exchangeRateUpdateInterval: data.exchange_rate_update_interval || 60,
+      priceRanges: (data.price_ranges as AppSettings['priceRanges']) || undefined,
       featureToggles: (data.feature_toggles as any) || undefined
     }
   },
@@ -817,7 +818,8 @@ export const settingsService = {
         exchange_rate_provider: settings.exchangeRateProvider,
         exchange_rate_api_key: settings.exchangeRateApiKey,
         exchange_rate_update_interval: settings.exchangeRateUpdateInterval,
-        feature_toggles: settings.featureToggles
+        feature_toggles: settings.featureToggles,
+        ...(settings.priceRanges !== undefined ? { price_ranges: settings.priceRanges } : {})
       })
       .eq('id', existingData.id)
       .select()
@@ -843,6 +845,7 @@ export const settingsService = {
       exchangeRateProvider: data.exchange_rate_provider as any || 'exchangerate',
       exchangeRateApiKey: data.exchange_rate_api_key || undefined,
       exchangeRateUpdateInterval: data.exchange_rate_update_interval || 60,
+      priceRanges: (data.price_ranges as AppSettings['priceRanges']) || undefined,
       featureToggles: (data.feature_toggles as any) || undefined
     }
   }

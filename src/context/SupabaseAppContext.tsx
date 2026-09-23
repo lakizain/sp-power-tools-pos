@@ -135,6 +135,7 @@ const initialState: AppState = {
     theme: 'light',
     invoicePrefix: 'INV',
     invoiceCounter: 1000,
+    priceRanges: undefined,
     featureToggles: defaultFeatureToggles,
   },
   salesTabs: [],

@@ -15,6 +15,7 @@ const InventoryManager = lazy(() => import('./components/inventory/InventoryMana
 const CustomerManager = lazy(() => import('./components/customers/CustomerManager').then((module) => ({ default: module.CustomerManager })));
 const ReportsManager = lazy(() => import('./components/reports/ReportsManager').then((module) => ({ default: module.ReportsManager })));
 const Settings = lazy(() => import('./components/settings/Settings').then((module) => ({ default: module.Settings })));
+const PriceRanges = lazy(() => import('./components/settings/PriceRanges').then((module) => ({ default: module.PriceRanges })));
 const DiscountManager = lazy(() => import('./components/discounts/DiscountManager').then((module) => ({ default: module.DiscountManager })));
 const UserManager = lazy(() => import('./components/users/UserManager').then((module) => ({ default: module.UserManager })));
 const SupplierManager = lazy(() => import('./components/suppliers/SupplierManager').then((module) => ({ default: module.SupplierManager })));
@@ -216,6 +217,11 @@ function AppContent() {
         return withSuspense(POSTerminal);
       case 'settings':
         return withSuspense(Settings);
+      case 'price-ranges':
+        if (userRole === 'admin' || userRole === 'manager') {
+          return withSuspense(PriceRanges);
+        }
+        return withSuspense(POSTerminal);
       default:
         return withSuspense(POSTerminal);
     }

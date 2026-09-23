@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   User, Settings, LogOut, ShoppingCart, Monitor, Smartphone, Bell, Menu, X, Percent,
   Receipt, Package, Users, BarChart3, Sun, Moon, Truck, Wallet, CreditCard, RotateCcw,
-  AlertTriangle, KeyRound
+  AlertTriangle, KeyRound, SlidersHorizontal
 } from 'lucide-react';
 import { useApp, useFeatureToggles } from '../../context/SupabaseAppContext';
 import { useAuth } from '../../context/AuthContext';
@@ -112,6 +112,10 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
     // Users - Admin only
     if (role === 'admin') {
       items.push({ id: 'users', label: 'Users', icon: User, color: 'text-indigo-600' });
+    }
+
+    if (isAdminOrManager) {
+      items.push({ id: 'price-ranges', label: 'Price Ranges', icon: SlidersHorizontal, color: 'text-emerald-600' });
     }
 
     return items;
