@@ -11,6 +11,7 @@ import { matchesAnyField, sortBySearchRelevance } from '../../lib/searchUtils';
 import { ExpenseModal, DEFAULT_CATEGORIES } from './ExpenseModal';
 import { format, startOfMonth, endOfMonth, isWithinInterval, subMonths, startOfWeek } from 'date-fns';
 import { TablePrintModal, PrintColumn, PrintSummary, PrintFilterInfo } from '../ui/TablePrintModal';
+import { expensesService } from '../../lib/services';
 
 export function ExpenseManager() {
   const { state, dispatch } = useApp();
@@ -187,21 +188,36 @@ export function ExpenseManager() {
       'Delete'
     );
     if (result.isConfirmed) {
-      dispatch({ type: 'DELETE_EXPENSE', payload: expense.id });
-      swalConfig.success('Expense deleted successfully.');
+      try {
+        await expensesService.delete(expense.id);
+        dispatch({ type: 'DELETE_EXPENSE', payload: expense.id });
+        swalConfig.success('Expense deleted successfully.');
+      } catch (error) {
+        console.error('Error deleting expense:', error);
+        swalConfig.error('Failed to delete expense. Please try again.');
+      }
     }
   };
 
-  const handleSave = (expense: Expense) => {
-    if (editingExpense) {
-      dispatch({ type: 'UPDATE_EXPENSE', payload: expense });
-      swalConfig.success('Expense updated successfully.');
-    } else {
-      dispatch({ type: 'ADD_EXPENSE', payload: expense });
-      swalConfig.success('Expense recorded successfully.');
+  const handleSave = async (expense: Expense) => {
+    try {
+      if (editingExpense) {
+        const { id, createdAt, updatedAt, ...updateData } = expense;
+        await expensesService.update(editingExpense.id, updateData);
+        dispatch({ type: 'UPDATE_EXPENSE', payload: expense });
+        swalConfig.success('Expense updated successfully.');
+      } else {
+        const { id, createdAt, updatedAt, ...createData } = expense;
+        const savedExpense = await expensesService.create(createData);
+        dispatch({ type: 'ADD_EXPENSE', payload: savedExpense });
+        swalConfig.success('Expense recorded successfully.');
+      }
+      setIsModalOpen(false);
+      setEditingExpense(null);
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      swalConfig.error('Failed to save expense. Please try again.');
     }
-    setIsModalOpen(false);
-    setEditingExpense(null);
   };
 
   const exportExpenses = () => {
