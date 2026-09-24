@@ -33,6 +33,11 @@ export function ReportsManager() {
     return saleDate >= startOfDay(validStartDate) && saleDate <= endOfDay(validEndDate);
   });
 
+  const filteredRentals = state.rentals.filter(rental => {
+    const rentalDate = new Date(rental.rentFrom);
+    return rentalDate >= startOfDay(validStartDate) && rentalDate <= endOfDay(validEndDate);
+  });
+
   // Sales Analytics
   const salesData = useMemo(() => {
     const salesByDay: Record<string, { date: string; sales: number; transactions: number }> = {};
@@ -96,8 +101,9 @@ export function ReportsManager() {
   }, [filteredSales]);
 
   // Summary Stats
-  const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
-  const totalTransactions = filteredSales.length;
+  const totalRentalRevenue = filteredRentals.reduce((sum, rental) => sum + rental.totalRent, 0);
+  const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0) + totalRentalRevenue;
+  const totalTransactions = filteredSales.length + filteredRentals.length;
   const averageTransaction = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
   const totalDiscounts = filteredSales.reduce((sum, sale) => sum + sale.discountAmount, 0);
 
@@ -282,6 +288,10 @@ export function ReportsManager() {
       });
     });
 
+    filteredRentals.forEach(rental => {
+      totalRevenue += rental.totalRent;
+    });
+
     // Calculate margins
     Object.values(productProfit).forEach(p => {
       p.margin = p.revenue > 0 ? (p.grossProfit / p.revenue) * 100 : 0;
@@ -315,7 +325,7 @@ export function ReportsManager() {
       categoryProfit: Object.values(categoryProfit).sort((a, b) => b.grossProfit - a.grossProfit),
       expenseByCategory: Object.values(expenseByCategory).sort((a, b) => b.value - a.value),
     };
-  }, [filteredSales, filteredExpenses]);
+  }, [filteredSales, filteredRentals, filteredExpenses]);
 
   // Daily Profit Trend
   const dailyProfitData = useMemo(() => {
@@ -340,6 +350,18 @@ export function ReportsManager() {
       }
     });
 
+    // Add daily rental amounts as revenue.
+    filteredRentals.forEach(rental => {
+      const date = format(new Date(rental.rentFrom), 'MM/dd');
+      if (profitByDay[date]) {
+        profitByDay[date].revenue += rental.totalRent;
+      }
+    });
+
+    Object.values(profitByDay).forEach(day => {
+      day.grossProfit = day.revenue - day.cogs;
+    });
+
     // Add expense data
     filteredExpenses.forEach(expense => {
       const date = format(new Date(expense.date), 'MM/dd');
@@ -354,7 +376,7 @@ export function ReportsManager() {
     });
 
     return Object.values(profitByDay);
-  }, [filteredSales, filteredExpenses, validEndDate, visibleDayCount]);
+  }, [filteredSales, filteredRentals, filteredExpenses, validEndDate, visibleDayCount]);
 
   const COLORS = ['#2563EB', '#059669', '#D97706', '#DC2626', '#7C3AED', '#EC4899'];
 
@@ -364,6 +386,9 @@ export function ReportsManager() {
     const summaryRows = dailyProfitData.map(day => ({
       date: day.date,
       revenue: day.revenue,
+      rentalRevenue: filteredRentals
+        .filter(rental => format(new Date(rental.rentFrom), 'MM/dd') === day.date)
+        .reduce((sum, rental) => sum + rental.totalRent, 0),
       expenses: day.expenses,
       netProfit: day.netProfit,
     }));
@@ -381,6 +406,7 @@ export function ReportsManager() {
 
     const totals = [
       ['Revenue', `${currency} ${profitData.totalRevenue.toFixed(2)}`],
+      ['Rental Revenue', `${currency} ${totalRentalRevenue.toFixed(2)}`],
       ['Discounts', `${currency} ${profitData.totalDiscounts.toFixed(2)}`],
       ['Gross Profit', `${currency} ${profitData.totalGrossProfit.toFixed(2)}`],
       ['Expenses', `${currency} ${profitData.totalExpenses.toFixed(2)}`],
@@ -400,6 +426,7 @@ export function ReportsManager() {
     const tableRows = summaryRows.slice(0, 12).map(row => [
       row.date,
       `${currency} ${row.revenue.toFixed(2)}`,
+      `${currency} ${row.rentalRevenue.toFixed(2)}`,
       `${currency} ${row.expenses.toFixed(2)}`,
       `${currency} ${row.netProfit.toFixed(2)}`,
     ]);
@@ -418,20 +445,22 @@ export function ReportsManager() {
     doc.setFillColor(245, 245, 245);
     doc.rect(14, y, 180, 10, 'F');
     doc.text('Date', 18, y + 7);
-    doc.text('Revenue', 72, y + 7);
-    doc.text('Expenses', 120, y + 7);
-    doc.text('Net', 165, y + 7);
+    doc.text('Revenue', 52, y + 7);
+    doc.text('Rentals', 92, y + 7);
+    doc.text('Expenses', 130, y + 7);
+    doc.text('Net', 172, y + 7);
     y += 12;
 
-    tableRows.forEach(([date, revenue, expenses, net]) => {
+    tableRows.forEach(([date, revenue, rentalRevenue, expenses, net]) => {
       if (y > 270) {
         doc.addPage();
         y = 18;
       }
       doc.text(date, 18, y + 6);
-      doc.text(revenue, 72, y + 6);
-      doc.text(expenses, 120, y + 6);
-      doc.text(net, 165, y + 6);
+      doc.text(revenue, 52, y + 6);
+      doc.text(rentalRevenue, 92, y + 6);
+      doc.text(expenses, 130, y + 6);
+      doc.text(net, 172, y + 6);
       y += 8;
     });
 
@@ -542,7 +571,7 @@ export function ReportsManager() {
 
       {reportType === 'summary' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 lg:gap-6">
             <div className="stat-card bg-gradient-to-br from-green-500 to-green-600">
               <div className="flex items-center justify-between relative z-10">
                 <div>
@@ -551,6 +580,18 @@ export function ReportsManager() {
                 </div>
                 <div className="bg-white/20 p-3 rounded-2xl">
                   <DollarSign className="h-6 w-6 lg:h-8 lg:w-8" />
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card bg-gradient-to-br from-violet-500 to-purple-600">
+              <div className="flex items-center justify-between relative z-10">
+                <div>
+                  <p className="text-violet-100 text-sm font-medium">Daily Rentals</p>
+                  <p className="text-xl lg:text-2xl font-bold">{state.settings.currency} {totalRentalRevenue.toFixed(2)}</p>
+                </div>
+                <div className="bg-white/20 p-3 rounded-2xl">
+                  <Wallet className="h-6 w-6 lg:h-8 lg:w-8" />
                 </div>
               </div>
             </div>

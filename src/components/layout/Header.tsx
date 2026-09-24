@@ -64,9 +64,9 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
       items.push({ id: 'inventory', label: 'Inventory', icon: Package, color: 'text-purple-600' });
     }
 
-    // Product Rentals - Optional feature
+    // Daily Product Rentals - Optional feature
     if (isAdminOrManager && features.productRentals) {
-      items.push({ id: 'rentals', label: 'Rentals', icon: KeyRound, color: 'text-violet-600' });
+      items.push({ id: 'rentals', label: 'Daily Product Rentals', icon: KeyRound, color: 'text-violet-600' });
     }
 
     if (isAdminOrManager) {
