@@ -69,6 +69,10 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
       items.push({ id: 'rentals', label: 'Rentals', icon: KeyRound, color: 'text-violet-600' });
     }
 
+    if (isAdminOrManager) {
+      items.push({ id: 'price-ranges', label: 'Price Ranges', icon: SlidersHorizontal, color: 'text-emerald-600' });
+    }
+
     // Reports - Manager and Admin can access
     if (isAdminOrManager) {
       items.push({ id: 'reports', label: 'Reports', icon: BarChart3, color: 'text-red-600' });
@@ -77,6 +81,11 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
     // Expense Tracking - Optional feature
     if (isAdminOrManager && features.expenseTracking) {
       items.push({ id: 'expenses', label: 'Expenses', icon: Wallet, color: 'text-rose-600' });
+    }
+
+    // Supplier Management - Optional feature
+    if (isAdminOrManager && features.supplierManagement) {
+      items.push({ id: 'suppliers', label: 'Suppliers', icon: Truck, color: 'text-teal-600' });
     }
 
     // Product Returns - Optional feature
@@ -94,11 +103,6 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
       items.push({ id: 'payments', label: 'Payments', icon: CreditCard, color: 'text-cyan-600' });
     }
 
-    // Supplier Management - Optional feature
-    if (isAdminOrManager && features.supplierManagement) {
-      items.push({ id: 'suppliers', label: 'Suppliers', icon: Truck, color: 'text-teal-600' });
-    }
-
     // Discounts - Optional feature now
     if (isAdminOrManager && features.productDiscount) {
       items.push({ id: 'discounts', label: 'Discounts', icon: Percent, color: 'text-pink-600' });
@@ -112,10 +116,6 @@ export function Header({ currentView, onViewChange }: HeaderProps) {
     // Users - Admin only
     if (role === 'admin') {
       items.push({ id: 'users', label: 'Users', icon: User, color: 'text-indigo-600' });
-    }
-
-    if (isAdminOrManager) {
-      items.push({ id: 'price-ranges', label: 'Price Ranges', icon: SlidersHorizontal, color: 'text-emerald-600' });
     }
 
     return items;
