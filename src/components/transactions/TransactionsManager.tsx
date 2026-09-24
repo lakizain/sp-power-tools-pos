@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek } from 'date-fns';
 import { Sale, CartItem } from '../../types';
 import { CheckoutModal } from '../pos/CheckoutModal';
+import { ReceiptPrint } from '../pos/ReceiptPrint';
 import { ReturnModal } from '../returns/ReturnModal';
 import { salesService, productsService, customersService, returnsService } from '../../lib/services';
 import { swalConfig } from '../../lib/sweetAlert';
@@ -618,6 +619,15 @@ export function TransactionsManager() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+                      {!isDraftSale(transaction) && (
+                        <button
+                          onClick={() => setSelectedTransaction(transaction)}
+                          className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                          title="Print Bill"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </button>
+                      )}
                       {(canEdit && !isDraftSale(transaction)) && (
                         <button
                           onClick={() => setSelectedTransaction(transaction)}
@@ -685,6 +695,7 @@ function TransactionDetailModal({ transaction, onClose, canDelete, canReturn, ca
   const { profile } = useAuth();
   const [showCheckout, setShowCheckout] = useState(false);
   const [showReturn, setShowReturn] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editItems, setEditItems] = useState<EditableCartItem[]>([]);
   const [editStatus, setEditStatus] = useState<Sale['status']>('completed');
@@ -795,6 +806,10 @@ function TransactionDetailModal({ transaction, onClose, canDelete, canReturn, ca
       if (customer) dispatch({ type: 'SET_SELECTED_CUSTOMER', payload: customer });
     }
     setShowCheckout(true);
+  };
+
+  const handlePrintReceipt = () => {
+    setShowReceipt(true);
   };
 
   const handleCheckoutComplete = async (_completedSale: Sale) => {
@@ -1184,6 +1199,15 @@ function TransactionDetailModal({ transaction, onClose, canDelete, canReturn, ca
               </>
             ) : (
               <>
+                {!isDraftSale(transaction) && (
+                  <button
+                    onClick={handlePrintReceipt}
+                    className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl font-semibold hover:from-indigo-600 hover:to-blue-700 shadow-md transition-all"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span>Print Bill</span>
+                  </button>
+                )}
                 {(canDelete || canReturn || canEdit) && (
                   <>
                     {canReturn && !isDraftSale(transaction) && (
@@ -1212,6 +1236,13 @@ function TransactionDetailModal({ transaction, onClose, canDelete, canReturn, ca
           </div>
         </div>
       </div>
+
+      {showReceipt && (
+        <ReceiptPrint
+          sale={transaction}
+          onClose={() => setShowReceipt(false)}
+        />
+      )}
 
       {showCheckout && (
         <CheckoutModal
