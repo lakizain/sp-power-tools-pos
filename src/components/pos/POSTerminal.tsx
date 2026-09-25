@@ -34,7 +34,7 @@ export function POSTerminal() {
 
       if (!product.trackInventory || newQuantity <= product.stock) {
         const discount = existingItem.discountType === 'percentage' && existingItem.discountRate !== undefined
-          ? (product.price * newQuantity * existingItem.discountRate) / 100
+          ? Math.round((product.price * newQuantity * existingItem.discountRate) / 100)
           : existingItem.discount || 0;
         const updatedItem = {
           ...existingItem,
@@ -210,7 +210,7 @@ export function POSTerminal() {
       const itemWeight = weight || undefined;
       const price = product.isWeightBased ? (product.pricePerUnit || 0) * (weight || 1) : product.price;
       const discountRate = getRangeDiscountPercentage(product.cost, state.settings.priceRanges);
-      const discount = (price * discountRate) / 100;
+      const discount = Math.round((price * discountRate) / 100);
 
       const newItem = {
         product,
