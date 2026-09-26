@@ -4,6 +4,7 @@ import { CartItem, Customer } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { matchesAnyField } from '../../lib/searchUtils';
 import { getPercentageDiscountAmount } from '../../lib/discountUtils';
+import { swalConfig } from '../../lib/sweetAlert';
 
 interface CartProps {
   onCheckout: () => void;
@@ -22,6 +23,11 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
       dispatch({ type: 'REMOVE_FROM_CART', payload: index });
     } else {
       const item = state.cart[index];
+      if (item.product.trackInventory && newQuantity > item.product.stock) {
+        swalConfig.warning(`Only ${item.product.stock} units of ${item.product.name} are available.`);
+        return;
+      }
+
       const price = item.product.isWeightBased 
         ? (item.product.pricePerUnit || 0) * (item.weight || 1)
         : item.product.price;
