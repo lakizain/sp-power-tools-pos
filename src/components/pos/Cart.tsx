@@ -3,6 +3,7 @@ import { Trash2, Plus, Minus, User, Percent, FileText, ShoppingCart } from 'luci
 import { CartItem, Customer } from '../../types';
 import { useApp } from '../../context/SupabaseAppContext';
 import { matchesAnyField } from '../../lib/searchUtils';
+import { getPercentageDiscountAmount } from '../../lib/discountUtils';
 
 interface CartProps {
   onCheckout: () => void;
@@ -25,7 +26,7 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
         ? (item.product.pricePerUnit || 0) * (item.weight || 1)
         : item.product.price;
       const discount = item.discountType === 'percentage' && item.discountRate !== undefined
-        ? Math.round((price * newQuantity * item.discountRate) / 100)
+        ? getPercentageDiscountAmount(price * newQuantity, item.discountRate)
         : item.discount || 0;
       const updatedItem = {
         ...item,
@@ -49,7 +50,7 @@ export function Cart({ onCheckout, onSaveDraft }: CartProps) {
     let discountAmount = 0;
     
     if (discountType === 'percentage') {
-      discountAmount = Math.round((price * item.quantity * discount) / 100);
+      discountAmount = getPercentageDiscountAmount(price * item.quantity, discount);
     } else {
       discountAmount = discount;
     }
